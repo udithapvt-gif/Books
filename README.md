@@ -1,73 +1,98 @@
-# Alexandria | Professional Library Management System
+# Alexandria | Professional Central Database Library Management System
 
-A modern, responsive, and secure **Library Management Portal** featuring dual **Admin** and **Member** authentication, full book/member catalog management with book image controls, and live borrowing circulation.
+A production-ready, multi-device **Library Management System** with a centralized live database, real-time cross-device synchronization, and full Admin & Member role authentication.
+
+---
+
+## 🗄️ Real Database Concept & Multi-Device Access
+
+All books, members, usernames, passwords, loan records, and cover art are persisted in the **Central Database** (`data/library_database.json`).
+
+### 📱 How to Access from Any Device (Phone, Tablet, Laptop)
+
+The backend server is built with **pure Node.js** (Zero external `npm install` dependencies required!):
+
+#### Step 1: Start the Database Server on your Computer
+Open PowerShell or Command Prompt in this folder:
+```powershell
+cd C:\Users\USER\.gemini\antigravity\scratch\library-system
+node server.js
+```
+
+You will see:
+```text
+======================================================
+🏛️  ALEXANDRIA LIVE DATABASE SERVER ONLINE!
+======================================================
+💻 On this computer:          http://localhost:3000
+📱 Any Phone/Tablet/Device:   http://192.168.1.X:3000
+🗄️  Persistent Database:      data/library_database.json
+======================================================
+```
+
+#### Step 2: Open on your Phone or Any Other Device
+- Connect your phone or other device to the same Wi-Fi network.
+- Open your phone's browser (Safari, Chrome) and type the address shown in the console (e.g. `http://192.168.1.X:3000`).
+- **Done!** You can now log in, borrow books, or manage members from your phone!
+
+#### Step 3: Real-Time Live Synchronization
+- If you add or borrow a book from your **phone**, it **instantly appears on your PC** without reloading (automatic 3-second live sync polling).
+- If a member self-registers on their **tablet**, the Administrator sees their username and password immediately on the **desktop PC**.
+
+---
+
+## ☁️ Access from Anywhere in the World (Free Cloud Hosting)
+
+If you want the database accessible over the public internet (not just local Wi-Fi):
+
+1. Upload this repository to **GitHub** (see instructions below).
+2. Go to [Render.com](https://render.com) or [Railway.app](https://railway.app) (both offer free hosting).
+3. Create a **New Web Service**, select your GitHub repository.
+4. Set Build Command to `npm install` and Start Command to `node server.js`.
+5. You will get a live worldwide HTTPS URL (e.g. `https://alexandria-library.onrender.com`).
+6. You and your members can now log in from any device, anywhere in the world, 24/7!
 
 ---
 
 ## 🔐 Login Credentials
 
-The site supports distinct roles with tailored views and permissions:
+| Role | Username | Password | Permissions & Capabilities |
+| :--- | :--- | :--- | :--- |
+| **🛡️ Administrator** | **`admin`** | **`123`** | • Full system oversight<br>• Add, edit, remove books & covers<br>• **View & manage members' usernames and passwords**<br>• Add/remove members<br>• Issue and return books for all patrons<br>• Multi-device database control |
+| **👤 Member / Patron** | **`marcus`** *(or any member)* | **`123`** | • Access from phone or PC<br>• Browse & search the live book catalog<br>• **Borrow books** directly (with tier quota tracking)<br>• View personal borrowed books & due dates |
 
-### 1. 🛡️ Administrator Login
-- **Username**: `admin`
-- **Password**: `123`
-- **Permissions**:
-  - Full system management and analytics.
-  - **Add, Edit, and Remove Books** (including uploading, changing, or removing book cover images).
-  - **View & Manage Member Login Credentials**: The Admin can view each member's username and password (with toggle hide/show), reset their passwords, or edit member profiles.
-  - **Issue and Return Books** to any patron.
-  - **Edit Institutional Profile** and export/import JSON database backups.
-
-### 2. 👤 Member / Patron Login
-- **Default Sample Members**:
-  - Username: `marcus` | Password: `123` (Dr. Marcus Chen - Faculty)
-  - Username: `sophia` | Password: `123` (Sophia Rodriguez - Premium Scholar)
-  - Username: `alex` | Password: `123` (Alexander Kim - Student)
-  - Username: `clara` | Password: `123` (Clara Hawthorne - Standard)
-- **Self-Registration**: New readers can click **"Member Sign Up"** on the login page to create their own username and password!
-- **Member Permissions**:
-  - View personal patron dashboard with their active loan quota.
-  - Browse, search, and filter the book catalog.
-  - **Borrow Books** directly from the catalog with automatic quota tracking.
-  - View their borrowed books list and due dates.
-  - Protected from unauthorized admin actions (members cannot delete books or access other members' private information).
+> 💡 **Member Self-Registration**: Any new user can click **"Member Sign Up"** from their own device to create a username and password. Their account is immediately saved to the central database and visible to the Admin.
 
 ---
 
 ## 🌟 Key Features
 
-### 1. 📚 Books & Cover Image Management
-- **Add / Edit Books**: Title, Author, Category, ISBN-13, Year, Copies, Shelf Location, Publisher, Synopsis.
-- **Cover Image Upload & Removal**:
-  - **File Upload**: Upload image files from your computer (auto-stored as Base64 in LocalStorage).
-  - **Image by URL**: Paste web URLs with instant preview.
-  - **Remove Image**: One-click removal button clears custom images and falls back to a clean academic procedural book spine.
-- **Remove Books**: Confirmation modal with loan checks (prevents deleting checked-out books).
-- **Search & Filters**: Live search by title, author, or ISBN; filter by category & stock.
-- **Dual Display Modes**: Toggle between Grid Cards and Table View.
+1. **Central Persistent Database**:
+   - Stored safely in `data/library_database.json`.
+   - Thread-safe reads and writes.
+   - Built-in data backup export and import.
 
-### 2. 👥 Members & Credentials Management (Admin Control)
-- **Add Members**: Enroll members with Name, Username, Password, Email, Phone, Tier, and Status.
-- **View Member Passwords**: Admin can view member passwords in the Members table using the password reveal button (`👁️`).
-- **Edit Member Credentials**: Admin can update or reset any member's login username or password at any time.
-- **De-enroll / Remove Members**: Guarded to prevent deletion if they have unreturned loans.
+2. **Books Catalog & Cover Images**:
+   - Add, edit, delete books with full metadata (ISBN, category, copies, shelf location, synopsis).
+   - **Cover Image Upload & Removal**: Upload image files (stored as Base64 in database), paste image URLs, or remove image to use the classic procedural book spine.
 
-### 3. 🔄 Circulation & Loan Tracking
-- **Check Out / Issue Books**: Admin can assign books to members; members can borrow books within their tier quota.
-- **Return Processing**: Returning a volume automatically restocks available copies.
-- **Overdue Detection**: Real-time badges indicating on-time vs. overdue status.
+3. **Members & Login Management**:
+   - Enrolled members with custom usernames and passwords.
+   - Admin can view passwords (with single or bulk "Show All" toggle) and reset passwords anytime.
+   - Safe de-enrollment prevents deleting patrons with unreturned volumes.
+
+4. **Live Circulation Desk**:
+   - Check out / Issue books with due date enforcement.
+   - Process returns to restock the live database inventory.
 
 ---
 
-## 🚀 How to Run the Website
+## 📁 File Structure
 
-No build tools or installation needed:
-
-1. Open File Explorer to:
-   ```text
-   C:\Users\USER\.gemini\antigravity\scratch\library-system\
-   ```
-2. Double-click **`index.html`** in any web browser (Chrome, Edge, Firefox, Brave).
-3. Test logging in as:
-   - **Admin**: `admin` / `123`
-   - **Member**: `marcus` / `123` (or register a new member account)
+| File | Purpose |
+| :--- | :--- |
+| [**`server.js`**](file:///C:/Users/USER/.gemini/antigravity/scratch/library-system/server.js) | Central Database and REST API Server (Pure Node.js, zero dependencies) |
+| [**`index.html`**](file:///C:/Users/USER/.gemini/antigravity/scratch/library-system/index.html) | Responsive user interface with multi-device status indicator and modal |
+| [**`app.js`**](file:///C:/Users/USER/.gemini/antigravity/scratch/library-system/app.js) | Frontend client with live background sync polling and database API calls |
+| [**`styles.css`**](file:///C:/Users/USER/.gemini/antigravity/scratch/library-system/styles.css) | Custom styling, badges, animations, and book spines |
+| [**`package.json`**](file:///C:/Users/USER/.gemini/antigravity/scratch/library-system/package.json) | Cloud deployment and npm scripts configuration |

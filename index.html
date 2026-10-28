@@ -52,11 +52,17 @@
           <i class="fa-solid fa-book-bookmark"></i>
         </div>
         <h1 class="text-2xl font-bold font-serif tracking-tight">Alexandria Library</h1>
-        <p class="text-xs text-slate-400 mt-1">Institutional Portal & Catalog Access</p>
+        <p class="text-xs text-slate-400 mt-1">Live Multi-Device Database Portal</p>
 
-        <!-- Decorative background icon -->
+        <!-- Live Database Badge on Login Screen -->
+        <div class="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-slate-800 border border-slate-700 cursor-pointer" onclick="openModal('modal-db-settings')">
+          <span id="auth-db-dot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+          <span id="auth-db-text" class="text-slate-300">Checking Live Database...</span>
+          <i class="fa-solid fa-sliders text-[10px] text-slate-400 ml-1"></i>
+        </div>
+
         <div class="absolute -right-6 -bottom-6 opacity-10 text-7xl text-white pointer-events-none">
-          <i class="fa-solid fa-landmark"></i>
+          <i class="fa-solid fa-database"></i>
         </div>
       </div>
 
@@ -71,7 +77,7 @@
       </div>
 
       <!-- Quick Credentials Hint Box -->
-      <div class="mx-6 mt-4 p-3.5 rounded-xl bg-amber-50/90 border border-amber-200 text-[11px] text-amber-950 space-y-1.5">
+      <div class="mx-6 mt-4 p-3.5 rounded-xl bg-amber-50/90 border border-amber-200 text-[11px] text-amber-900 space-y-1.5">
         <p class="font-bold flex items-center gap-1.5 text-amber-950">
           <i class="fa-solid fa-key text-amber-600"></i> Click to Auto-Fill Login Credentials:
         </p>
@@ -175,8 +181,11 @@
         </div>
       </form>
 
-      <div class="p-4 bg-slate-50 border-t border-slate-100 text-center text-xs text-slate-500">
-        Alexandria Library System • Credentials are fully manageable by Admin
+      <div class="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+        <span>Alexandria Central Database</span>
+        <button onclick="openModal('modal-db-settings')" class="text-indigo-600 hover:underline flex items-center gap-1 font-semibold">
+          <i class="fa-solid fa-network-wired"></i> Any-Device Setup
+        </button>
       </div>
     </div>
   </div>
@@ -226,7 +235,7 @@
             <span id="badge-total-members" class="text-xs bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full">0</span>
           </button>
 
-          <!-- Circulation: Shown to Admin and Members -->
+          <!-- Circulation -->
           <button onclick="switchView('circulation')" id="nav-circulation" class="nav-btn w-full flex items-center justify-between px-4 py-3 rounded-xl transition text-slate-400 hover:text-white hover:bg-slate-800/50">
             <div class="flex items-center gap-3.5">
               <i class="fa-solid fa-arrow-right-arrow-left w-5 text-cyan-400"></i>
@@ -243,8 +252,17 @@
         </nav>
       </div>
 
-      <!-- Current User Profile Box & Logout -->
+      <!-- Current User Profile Box & Live Database Indicator -->
       <div class="p-4 m-3 rounded-xl bg-slate-800/70 border border-slate-700/60 text-xs text-slate-300 space-y-3">
+        <!-- Live Database Status in Sidebar -->
+        <div class="flex items-center justify-between pb-2 border-b border-slate-700/60 cursor-pointer" onclick="openModal('modal-db-settings')">
+          <div class="flex items-center gap-2">
+            <span id="sidebar-db-dot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span id="sidebar-db-status" class="text-[11px] font-semibold text-slate-300">Live Database</span>
+          </div>
+          <i class="fa-solid fa-mobile-screen-button text-amber-400 text-xs" title="Open on phone/tablet"></i>
+        </div>
+
         <div class="flex items-center gap-2.5">
           <div id="sidebar-user-avatar" class="w-9 h-9 rounded-full bg-amber-500/20 text-amber-300 flex items-center justify-center font-bold text-sm">
             <i class="fa-solid fa-user-shield"></i>
@@ -270,6 +288,9 @@
         <span class="font-bold text-white text-base">Alexandria</span>
       </div>
       <div class="flex items-center gap-2">
+        <button onclick="openModal('modal-db-settings')" class="p-2 text-amber-400">
+          <i class="fa-solid fa-database"></i>
+        </button>
         <button onclick="handleLogout()" class="px-2.5 py-1 bg-slate-800 text-slate-300 text-xs rounded-lg">
           <i class="fa-solid fa-arrow-right-from-bracket"></i>
         </button>
@@ -296,6 +317,9 @@
       <button onclick="switchView('library-info'); toggleMobileMenu()" class="admin-only w-full text-left p-2.5 text-slate-300 hover:bg-slate-800 rounded-lg flex items-center gap-3">
         <i class="fa-solid fa-building-columns w-5 text-rose-400"></i> Library Profile
       </button>
+      <button onclick="openModal('modal-db-settings'); toggleMobileMenu()" class="w-full text-left p-2.5 text-amber-300 hover:bg-slate-800 rounded-lg flex items-center gap-3">
+        <i class="fa-solid fa-database w-5 text-amber-400"></i> Database & Devices Setup
+      </button>
     </div>
 
     <!-- Main Content Area -->
@@ -304,8 +328,15 @@
       <!-- Top Header -->
       <header class="h-20 bg-white border-b border-slate-200/80 px-6 sm:px-8 flex items-center justify-between gap-4 sticky top-0 z-10 shadow-xs">
         <div>
-          <h2 id="page-title" class="text-xl font-bold text-slate-900 tracking-tight">System Dashboard</h2>
-          <p id="page-subtitle" class="text-xs text-slate-500">Welcome to Alexandria Library Portal & Information System</p>
+          <div class="flex items-center gap-2.5">
+            <h2 id="page-title" class="text-xl font-bold text-slate-900 tracking-tight">System Dashboard</h2>
+            <!-- Database Connection Pill in Header -->
+            <button onclick="openModal('modal-db-settings')" id="header-db-pill" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span id="header-db-text">Database Online</span>
+            </button>
+          </div>
+          <p id="page-subtitle" class="text-xs text-slate-500">Live multi-device library management & sync</p>
         </div>
 
         <!-- Header Actions: Admin vs Member -->
@@ -326,6 +357,12 @@
             </button>
           </div>
 
+          <!-- Connect Any Device Button -->
+          <button onclick="openModal('modal-db-settings')" title="Connect Phone or Other Devices" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition">
+            <i class="fa-solid fa-mobile-screen-button text-amber-600"></i>
+            <span>Any Device</span>
+          </button>
+
           <!-- User Profile Tag / Logout -->
           <div class="flex items-center gap-2 border-l border-slate-200 pl-3 ml-1">
             <span id="top-user-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-800">
@@ -345,27 +382,31 @@
         <!-- VIEW 1: DASHBOARD -->
         <!-- ========================================== -->
         <section id="view-dashboard" class="space-y-8">
-          <!-- Welcome Hero Banner -->
           <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-6 sm:p-8 shadow-xl relative overflow-hidden border border-slate-800">
             <div class="relative z-10 max-w-2xl space-y-2">
-              <span id="dash-role-badge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-semibold uppercase tracking-wider">
-                <i class="fa-solid fa-user-shield"></i> Administrator Dashboard
-              </span>
+              <div class="flex items-center gap-2">
+                <span id="dash-role-badge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-semibold uppercase tracking-wider">
+                  <i class="fa-solid fa-user-shield"></i> Administrator Dashboard
+                </span>
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold">
+                  <i class="fa-solid fa-database"></i> Live Database Synchronized
+                </span>
+              </div>
               <h2 class="text-2xl sm:text-3xl font-bold font-serif tracking-tight text-white" id="dash-greeting">Welcome to The Alexandria Athenaeum</h2>
               <p class="text-slate-300 text-sm leading-relaxed" id="dash-lib-tagline">
-                Manage physical & digital archives, catalog new volumes with custom cover imagery, supervise student and scholar memberships, and control circulation seamlessly.
+                All book volumes, member credentials, and active loans are stored in the central database and kept live across all connected computers and phones.
               </p>
               <div class="pt-3 flex flex-wrap gap-4 text-xs text-slate-300">
                 <span class="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-lg backdrop-blur-sm">
                   <i class="fa-regular fa-clock text-amber-400"></i> Hours: <strong id="dash-hours" class="text-white">8:00 AM - 9:00 PM</strong>
                 </span>
-                <span class="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-lg backdrop-blur-sm">
-                  <i class="fa-solid fa-phone text-indigo-300"></i> Support: <strong id="dash-phone" class="text-white">+1 (555) 234-8900</strong>
+                <span class="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-lg backdrop-blur-sm cursor-pointer" onclick="openModal('modal-db-settings')">
+                  <i class="fa-solid fa-wifi text-emerald-300"></i> Multi-Device Sync: <strong class="text-emerald-300">Active</strong>
                 </span>
               </div>
             </div>
             <div class="absolute -right-8 -bottom-10 opacity-10 text-slate-100 text-9xl pointer-events-none">
-              <i class="fa-solid fa-book-atlas"></i>
+              <i class="fa-solid fa-database"></i>
             </div>
           </div>
 
@@ -422,7 +463,7 @@
               <div class="flex items-center justify-between">
                 <div>
                   <h4 class="font-bold text-slate-900 text-base">Recently Added Volumes</h4>
-                  <p class="text-xs text-slate-500">Explore the latest titles in the library collection</p>
+                  <p class="text-xs text-slate-500">Live database titles accessible from any device</p>
                 </div>
                 <button onclick="switchView('books')" class="text-xs text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1">
                   Browse Catalog <i class="fa-solid fa-arrow-right text-[10px]"></i>
@@ -441,7 +482,7 @@
               </div>
 
               <div class="bg-white rounded-2xl border border-slate-200/80 p-6 space-y-3">
-                <h4 class="font-bold text-slate-900 text-base">Activity Highlights</h4>
+                <h4 class="font-bold text-slate-900 text-base">Live Activity Audit</h4>
                 <ul id="dash-activity-log" class="text-xs space-y-3 text-slate-600"></ul>
               </div>
             </div>
@@ -687,15 +728,18 @@
           </div>
 
           <div class="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-8 space-y-4 shadow-xs">
-            <h3 class="text-base font-bold text-slate-900">System Data Management & Persistence</h3>
-            <p class="text-xs text-slate-500">Your books, members, login credentials, cover images, and loan registries are stored safely in local browser storage.</p>
+            <h3 class="text-base font-bold text-slate-900">Database Backups & Multi-Device Control</h3>
+            <p class="text-xs text-slate-500">Your books, members, login credentials, cover images, and loan registries are stored in the central database file.</p>
             
             <div class="flex flex-wrap items-center gap-3 pt-2">
+              <button onclick="openModal('modal-db-settings')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl flex items-center gap-2 transition">
+                <i class="fa-solid fa-network-wired"></i> Any-Device Database Settings
+              </button>
               <button onclick="exportData()" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl flex items-center gap-2 transition">
-                <i class="fa-solid fa-download"></i> Export Library Data (JSON)
+                <i class="fa-solid fa-download"></i> Export Database (JSON)
               </button>
               <label class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl flex items-center gap-2 cursor-pointer transition">
-                <i class="fa-solid fa-upload"></i> Import Data
+                <i class="fa-solid fa-upload"></i> Import Database
                 <input type="file" id="import-file-input" onchange="importData(event)" accept=".json" class="hidden">
               </label>
               <button onclick="resetToSampleData()" class="px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold rounded-xl flex items-center gap-2 transition ml-auto">
@@ -709,8 +753,87 @@
 
       <!-- Footer -->
       <footer class="bg-white border-t border-slate-200/80 py-4 px-8 text-center text-xs text-slate-400">
-        <p>&copy; 2026 Alexandria Library Information System. All Rights Reserved.</p>
+        <p>&copy; 2026 Alexandria Library Information System. Live Central Database Sync Enabled.</p>
       </footer>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: ANY-DEVICE DATABASE & NETWORK SETTINGS -->
+  <!-- ======================================================== -->
+  <div id="modal-db-settings" class="modal-overlay hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-slate-200 my-8 overflow-hidden">
+      <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <i class="fa-solid fa-network-wired text-amber-400"></i>
+          <h3 class="font-bold text-base">Live Database & Cross-Device Access</h3>
+        </div>
+        <button onclick="closeModal('modal-db-settings')" class="text-slate-400 hover:text-white">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-5">
+        <!-- Live Connection Status Card -->
+        <div class="p-4 rounded-2xl border flex items-center justify-between" id="db-modal-status-card">
+          <div class="space-y-0.5">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Database Connection</span>
+            <p class="font-bold text-slate-800 text-sm flex items-center gap-2" id="db-modal-status-text">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span> Central Database Online
+            </p>
+          </div>
+          <button onclick="testDatabaseConnection()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition">
+            <i class="fa-solid fa-rotate mr-1"></i> Test Link
+          </button>
+        </div>
+
+        <!-- How to connect from phone/other PC -->
+        <div class="space-y-2">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-700">📱 Open on Phone or Other Computers</h4>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            When the database server is running on this computer, any smartphone, tablet, or laptop on the same Wi-Fi network can log in and view live books instantly at:
+          </p>
+          <div class="p-3 bg-slate-900 text-amber-300 font-mono text-xs rounded-xl flex items-center justify-between">
+            <span id="db-modal-lan-url">http://&lt;your-local-ip&gt;:3000</span>
+            <button onclick="copyLanUrl()" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded text-[11px] font-sans">
+              Copy URL
+            </button>
+          </div>
+        </div>
+
+        <!-- How to Start the Server -->
+        <div class="space-y-2 p-3.5 bg-indigo-50/70 border border-indigo-100 rounded-xl text-xs text-indigo-950">
+          <p class="font-bold flex items-center gap-1.5">
+            <i class="fa-solid fa-terminal text-indigo-600"></i> How to run the Central Database Server:
+          </p>
+          <p class="text-slate-600 text-[11px]">
+            Open terminal or PowerShell in this folder and run:
+          </p>
+          <code class="block bg-slate-900 text-emerald-300 font-mono p-2 rounded-lg text-xs">
+            node server.js
+          </code>
+          <p class="text-[11px] text-slate-500">
+            Works with zero installations! The database file is stored safely at <code class="font-bold text-slate-700">data/library_database.json</code>.
+          </p>
+        </div>
+
+        <!-- Custom Cloud API Server URL -->
+        <div class="space-y-2 pt-2 border-t border-slate-100">
+          <label class="block text-xs font-bold text-slate-700">Custom Cloud / Backend API URL (Optional)</label>
+          <input type="url" id="db-input-api-url" placeholder="http://localhost:3000 (leave blank for auto-detect)" 
+                 class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <p class="text-[10px] text-slate-400">If you deploy <code class="text-slate-600">server.js</code> to Render, Railway, or Glitch, enter your live URL here to access it from anywhere in the world.</p>
+        </div>
+
+        <div class="pt-2 flex items-center justify-end gap-2.5">
+          <button onclick="closeModal('modal-db-settings')" class="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition">
+            Close
+          </button>
+          <button onclick="saveCustomApiUrl()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-xs transition">
+            Save & Connect
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -746,7 +869,6 @@
                 <p class="text-xs">No Cover Selected</p>
               </div>
 
-              <!-- Overlay Remove Image Button -->
               <div id="book-image-action-overlay" class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2 transition duration-200 hidden">
                 <button type="button" onclick="removeBookImage()" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg shadow-md flex items-center gap-1.5">
                   <i class="fa-solid fa-trash-can"></i> Remove Image
@@ -844,7 +966,7 @@
             Cancel
           </button>
           <button type="submit" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl shadow-sm transition">
-            <i class="fa-solid fa-check mr-1.5"></i> Save Book Record
+            <i class="fa-solid fa-check mr-1.5"></i> Save to Database
           </button>
         </div>
       </form>
@@ -892,7 +1014,7 @@
                      class="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
             </div>
           </div>
-          <p class="text-[10px] text-amber-800">Admin can change this member's password anytime. The member can use this to sign in.</p>
+          <p class="text-[10px] text-amber-800">Admin can change this member's password anytime. The member can use this from any device.</p>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -939,7 +1061,7 @@
             Cancel
           </button>
           <button type="submit" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-sm transition">
-            <i class="fa-solid fa-check mr-1.5"></i> Save Member Credentials
+            <i class="fa-solid fa-check mr-1.5"></i> Save to Database
           </button>
         </div>
       </form>
@@ -1032,7 +1154,6 @@
               <div><span class="text-slate-400">Stock Status:</span> <strong id="detail-book-stock" class="text-emerald-600 font-bold">Available</strong></div>
             </div>
 
-            <!-- Actions Bar: Borrow for Member or Edit/Delete for Admin -->
             <div class="pt-3 border-t border-slate-100 flex items-center gap-2.5">
               <button id="detail-btn-member-borrow" class="hidden px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition shadow-xs flex items-center gap-1.5">
                 <i class="fa-solid fa-arrow-right-arrow-left"></i> Borrow This Volume
@@ -1061,7 +1182,7 @@
       </div>
       <div>
         <h3 id="delete-confirm-title" class="text-lg font-bold text-slate-900">Confirm Deletion</h3>
-        <p id="delete-confirm-desc" class="text-xs text-slate-500 mt-1">Are you sure you want to permanently remove this record?</p>
+        <p id="delete-confirm-desc" class="text-xs text-slate-500 mt-1">Are you sure you want to permanently remove this record from database?</p>
       </div>
       <div class="flex items-center justify-center gap-3 pt-2">
         <button onclick="closeModal('modal-confirm-delete')" class="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition">
@@ -1128,10 +1249,10 @@
     </div>
   </div>
 
-  <!-- Toast Notification Alert Container -->
+  <!-- Toast Container -->
   <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2.5 pointer-events-none"></div>
 
-  <!-- Main JavaScript App -->
+  <!-- Main JavaScript App with Live Database Integration -->
   <script src="app.js"></script>
 </body>
 </html>

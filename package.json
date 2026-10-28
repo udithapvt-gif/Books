@@ -1,0 +1,22 @@
+{
+  "name": "alexandria-library-system",
+  "version": "2.5.0",
+  "description": "Professional Library Management Portal with live multi-device database synchronization",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "library",
+    "management",
+    "database",
+    "catalog",
+    "books",
+    "members"
+  ],
+  "author": "Alexandria Systems",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

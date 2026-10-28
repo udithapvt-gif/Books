@@ -1,21 +1,38 @@
 /**
- * Alexandria Library Management System - Core Application Logic
- * Comprehensive Authentication (Admin & Member roles),
- * Member Credentials Management (Admin View, Edit, & Reset),
- * Member Self-Registration with Robust Persistence,
- * Book Management with Image Upload/Removal, and Circulation.
+ * Alexandria Library Management System - Live Central Database Client
+ * Multi-device synchronization, real-time live polling,
+ * Full CRUD for Books (with Cover Upload/Removal),
+ * Members & Credentials management by Admin, and Circulation.
  */
 
 // ==========================================
-// 1. STORAGE KEYS & INITIAL SEED DATA
+// 1. STORAGE KEYS & API CONFIGURATION
 // ==========================================
 
 const STORAGE_KEY_BOOKS = 'alexandria_books_v1';
-const STORAGE_KEY_MEMBERS = 'alexandria_members_v2'; // Bumped key to ensure clean schema migration
+const STORAGE_KEY_MEMBERS = 'alexandria_members_v2';
 const STORAGE_KEY_LOANS = 'alexandria_loans_v1';
 const STORAGE_KEY_LOGS = 'alexandria_logs_v1';
 const STORAGE_KEY_PROFILE = 'alexandria_profile_v1';
 const STORAGE_KEY_USER = 'alexandria_current_user_v2';
+const STORAGE_KEY_API_URL = 'alexandria_custom_api_url_v1';
+
+// Determine backend API URL (auto-detected if served via server, or localhost:3000)
+function getApiBaseUrl() {
+  const custom = localStorage.getItem(STORAGE_KEY_API_URL);
+  if (custom && custom.trim()) {
+    return custom.trim().replace(/\/+$/, '');
+  }
+  if (window.location.protocol.startsWith('http')) {
+    return window.location.origin;
+  }
+  return 'http://localhost:3000';
+}
+
+let API_BASE = getApiBaseUrl();
+let isServerConnected = false;
+let lastKnownDatabaseTimestamp = null;
+let syncPollingTimer = null;
 
 const ADMIN_CREDENTIALS = {
   username: "admin",
@@ -47,7 +64,7 @@ const DEFAULT_BOOKS = [
     available: 4,
     location: "Shelf CS-03",
     publisher: "Prentice Hall",
-    description: "Even bad code can function. But if code isn't clean, it can bring a development organization to its knees. A timeless guide to writing readable, maintainable software.",
+    description: "Even bad code can function. But if code isn't clean, it can bring a development organization to its knees.",
     coverImage: "https://images.unsplash.com/photo-1532012164546-f432f2e3777a?auto=format&fit=crop&w=600&q=80"
   },
   {
@@ -61,7 +78,7 @@ const DEFAULT_BOOKS = [
     available: 3,
     location: "Shelf LIT-12",
     publisher: "Charles Scribner's Sons",
-    description: "A portrait of the Jazz Age in all its decadence and excess, exploring themes of idealism, social upheaval, and the elusive American Dream.",
+    description: "A portrait of the Jazz Age exploring idealism, social upheaval, and the elusive American Dream.",
     coverImage: "https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=600&q=80"
   },
   {
@@ -75,7 +92,7 @@ const DEFAULT_BOOKS = [
     available: 3,
     location: "Shelf PHY-07",
     publisher: "Bantam Books",
-    description: "From the big bang to black holes, Stephen Hawking explores the most profound questions about our universe, time, and cosmic origins in accessible prose.",
+    description: "From the big bang to black holes, Stephen Hawking explores the most profound questions about our universe.",
     coverImage: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=600&q=80"
   },
   {
@@ -89,7 +106,7 @@ const DEFAULT_BOOKS = [
     available: 5,
     location: "Shelf HIST-02",
     publisher: "Harper",
-    description: "How did an insignificant ape become the ruler of planet Earth? Harari recounts the evolutionary and cultural breakthroughs that shaped human civilization.",
+    description: "How did an insignificant ape become the ruler of planet Earth? Harari recounts human civilizational history.",
     coverImage: "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=600&q=80"
   },
   {
@@ -103,7 +120,7 @@ const DEFAULT_BOOKS = [
     available: 2,
     location: "Shelf PHIL-01",
     publisher: "Penguin Classics",
-    description: "Plato's seminal dialogue examining justice, the nature of the philosopher king, the ideal society, and the allegory of the cave.",
+    description: "Plato's seminal dialogue examining justice, the ideal society, and the allegory of the cave.",
     coverImage: ""
   },
   {
@@ -117,12 +134,11 @@ const DEFAULT_BOOKS = [
     available: 4,
     location: "Shelf CS-05",
     publisher: "Addison-Wesley",
-    description: "The foundational 'Gang of Four' classic cataloging 23 recurring software design patterns that solve common object-oriented design problems.",
+    description: "The foundational Gang of Four classic cataloging 23 software design patterns.",
     coverImage: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=600&q=80"
   }
 ];
 
-// Default members with guaranteed usernames and passwords
 const DEFAULT_MEMBERS = [
   {
     id: "MEM-1001",
@@ -214,38 +230,168 @@ const DEFAULT_LOANS = [
 ];
 
 const DEFAULT_LOGS = [
-  { text: "System initialized with Alexandria v2.5 Auth & Catalog", time: "Just now", type: "system" },
-  { text: "Dr. Marcus Chen checked out 'Clean Code'", time: "Oct 18, 2026", type: "loan" },
-  { text: "Sophia Rodriguez renewed membership to Premium Tier", time: "Oct 15, 2026", type: "member" },
-  { text: "New volume 'Design Patterns' accessioned to Shelf CS-05", time: "Oct 10, 2026", type: "book" }
+  { text: "System initialized with Alexandria v2.5 Central Database Client", time: "Just now", type: "system" }
 ];
 
-// App State
+// App In-Memory State
 let books = [];
 let members = [];
 let loans = [];
 let logs = [];
 let libraryProfile = {};
-let currentUser = null; // { role: 'admin'|'member', username, name, id?, tier? }
+let currentUser = null;
 
-// Tracking revealed passwords in admin table
 let revealedPasswords = new Set();
 let allPasswordsRevealed = false;
-
-// View and filter states
 let currentView = 'dashboard';
 let bookViewMode = 'grid';
 let activeDeleteTarget = null;
 let currentModalCoverImage = null;
 
 // ==========================================
-// 2. DATA SANITIZATION & MIGRATION
+// 2. CENTRAL DATABASE CONNECTION & SYNC
 // ==========================================
 
-/**
- * Ensures every member record ALWAYS has valid, non-empty username and password strings.
- * Seamlessly upgrades any legacy localStorage data.
- */
+async function checkDatabaseConnection() {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
+
+    const res = await fetch(`${API_BASE}/api/status`, {
+      signal: controller.signal,
+      cache: 'no-cache'
+    });
+    clearTimeout(timeoutId);
+
+    if (res.ok) {
+      const data = await res.json();
+      isServerConnected = true;
+      updateDatabaseUiStatus(true, data);
+      await syncWithServerDatabase(true);
+      startLivePolling();
+      return true;
+    }
+  } catch (err) {
+    // Server is not running or offline
+  }
+
+  isServerConnected = false;
+  updateDatabaseUiStatus(false);
+  loadFromLocalStorage();
+  return false;
+}
+
+function updateDatabaseUiStatus(connected, serverData = null) {
+  const authDot = document.getElementById('auth-db-dot');
+  const authText = document.getElementById('auth-db-text');
+  const sidebarDot = document.getElementById('sidebar-db-dot');
+  const sidebarStatus = document.getElementById('sidebar-db-status');
+  const headerPill = document.getElementById('header-db-pill');
+  const headerText = document.getElementById('header-db-text');
+  const modalText = document.getElementById('db-modal-status-text');
+  const lanUrlEl = document.getElementById('db-modal-lan-url');
+
+  if (connected) {
+    if (authDot) authDot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse";
+    if (authText) authText.innerText = "Central Database Online";
+    if (sidebarDot) sidebarDot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse";
+    if (sidebarStatus) sidebarStatus.innerText = "Live Database";
+    if (headerPill) headerPill.className = "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition";
+    if (headerText) headerText.innerText = "Database Live";
+    if (modalText) modalText.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span> Connected to Central Database (${API_BASE})`;
+
+    if (serverData && serverData.localIps && serverData.localIps.length > 0 && lanUrlEl) {
+      lanUrlEl.innerText = `http://${serverData.localIps[0]}:${serverData.port || 3000}`;
+    }
+  } else {
+    if (authDot) authDot.className = "w-2 h-2 rounded-full bg-amber-400";
+    if (authText) authText.innerText = "Local Mode (Run server.js)";
+    if (sidebarDot) sidebarDot.className = "w-2 h-2 rounded-full bg-amber-400";
+    if (sidebarStatus) sidebarStatus.innerText = "Local Mode";
+    if (headerPill) headerPill.className = "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition";
+    if (headerText) headerText.innerText = "Local Mode (Connect)";
+    if (modalText) modalText.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Local Offline (Run 'node server.js' to enable live sync)`;
+  }
+}
+
+// Hydrate state from server database
+async function syncWithServerDatabase(force = false) {
+  if (!isServerConnected) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/sync`, { cache: 'no-cache' });
+    if (!res.ok) return;
+
+    const data = await res.json();
+    if (force || data.lastUpdated !== lastKnownDatabaseTimestamp) {
+      lastKnownDatabaseTimestamp = data.lastUpdated;
+      books = data.books || [];
+      members = data.members || [];
+      loans = data.loans || [];
+      logs = data.logs || [];
+      libraryProfile = data.profile || DEFAULT_PROFILE;
+
+      // Keep localStorage as local offline mirror
+      saveToLocalStorage();
+
+      // Refresh whatever view is currently visible
+      renderCurrentView();
+      populateCategoryFilter();
+      updateBadges();
+    }
+  } catch (err) {
+    console.warn('[Sync Error]', err);
+  }
+}
+
+// Background polling for real-time live synchronization between devices
+function startLivePolling() {
+  if (syncPollingTimer) clearInterval(syncPollingTimer);
+  syncPollingTimer = setInterval(async () => {
+    if (isServerConnected) {
+      await syncWithServerDatabase(false);
+    }
+  }, 3000); // Polls every 3 seconds
+}
+
+function testDatabaseConnection() {
+  showToast('Connecting to central database...', 'info');
+  API_BASE = getApiBaseUrl();
+  checkDatabaseConnection().then(connected => {
+    if (connected) {
+      showToast('Successfully connected to Central Database!', 'success');
+    } else {
+      showToast('Could not connect to database server. Make sure "node server.js" is running.', 'error');
+    }
+  });
+}
+
+function saveCustomApiUrl() {
+  const input = document.getElementById('db-input-api-url');
+  const val = (input ? input.value : '').trim();
+  if (val) {
+    localStorage.setItem(STORAGE_KEY_API_URL, val);
+  } else {
+    localStorage.removeItem(STORAGE_KEY_API_URL);
+  }
+  API_BASE = getApiBaseUrl();
+  closeModal('modal-db-settings');
+  testDatabaseConnection();
+}
+
+function copyLanUrl() {
+  const urlText = document.getElementById('db-modal-lan-url').innerText;
+  navigator.clipboard.writeText(urlText).then(() => {
+    showToast('Copied device URL to clipboard! Open this on your phone.', 'success');
+  }).catch(() => {
+    showToast('URL: ' + urlText, 'info');
+  });
+}
+
+// ==========================================
+// 3. LOCAL STORAGE FALLBACK & MIGRATION
+// ==========================================
+
 function sanitizeMembersList(rawList) {
   if (!Array.isArray(rawList) || rawList.length === 0) {
     return JSON.parse(JSON.stringify(DEFAULT_MEMBERS));
@@ -262,19 +408,17 @@ function sanitizeMembersList(rawList) {
     let username = (m.username || '').toString().trim();
     let password = (m.password || '').toString().trim();
 
-    // If username is missing, assign from map or generate from name
     if (!username) {
       if (defaultCredsMap[m.id]) {
         username = defaultCredsMap[m.id].username;
       } else if (m.name) {
-        const cleanName = m.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-        username = cleanName.slice(0, 8) || `member${idx + 1}`;
+        const clean = m.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+        username = clean.slice(0, 8) || `member${idx + 1}`;
       } else {
         username = `member${idx + 1}`;
       }
     }
 
-    // If password is missing, set to 123
     if (!password) {
       if (defaultCredsMap[m.id]) {
         password = defaultCredsMap[m.id].password;
@@ -298,9 +442,8 @@ function sanitizeMembersList(rawList) {
   });
 }
 
-function loadData() {
+function loadFromLocalStorage() {
   const storedBooks = localStorage.getItem(STORAGE_KEY_BOOKS);
-  // Check v2 key first, then fallback to v1 for backwards compatibility
   const storedMembers = localStorage.getItem(STORAGE_KEY_MEMBERS) || localStorage.getItem('alexandria_members_v1');
   const storedLoans = localStorage.getItem(STORAGE_KEY_LOANS);
   const storedLogs = localStorage.getItem(STORAGE_KEY_LOGS);
@@ -308,14 +451,9 @@ function loadData() {
 
   books = storedBooks ? JSON.parse(storedBooks) : [...DEFAULT_BOOKS];
 
-  // Parse and strictly sanitize members list
   let rawMembers = null;
   if (storedMembers) {
-    try {
-      rawMembers = JSON.parse(storedMembers);
-    } catch (e) {
-      rawMembers = null;
-    }
+    try { rawMembers = JSON.parse(storedMembers); } catch(e){}
   }
   members = sanitizeMembersList(rawMembers);
 
@@ -323,10 +461,10 @@ function loadData() {
   logs = storedLogs ? JSON.parse(storedLogs) : [...DEFAULT_LOGS];
   libraryProfile = storedProfile ? JSON.parse(storedProfile) : { ...DEFAULT_PROFILE };
 
-  saveData();
+  saveToLocalStorage();
 }
 
-function saveData() {
+function saveToLocalStorage() {
   localStorage.setItem(STORAGE_KEY_BOOKS, JSON.stringify(books));
   localStorage.setItem(STORAGE_KEY_MEMBERS, JSON.stringify(members));
   localStorage.setItem(STORAGE_KEY_LOANS, JSON.stringify(loans));
@@ -348,42 +486,40 @@ function logActivity(text, type = 'info') {
   };
   logs.unshift(newLog);
   if (logs.length > 25) logs.pop();
-  saveData();
+  saveToLocalStorage();
   if (currentView === 'dashboard') renderDashboard();
 }
 
 // ==========================================
-// 3. AUTHENTICATION & LOGIN LOGIC
+// 4. INITIALIZATION & AUTH CHECKS
 // ==========================================
 
-function initSystem() {
-  loadData();
+async function initSystem() {
   setupEventListeners();
   populateCategoryFilter();
 
-  // Restore active user session if valid
+  const customUrl = localStorage.getItem(STORAGE_KEY_API_URL);
+  if (customUrl && document.getElementById('db-input-api-url')) {
+    document.getElementById('db-input-api-url').value = customUrl;
+  }
+
+  // First load local storage so UI is immediately responsive
+  loadFromLocalStorage();
+
+  // Restore session
   const storedUser = localStorage.getItem(STORAGE_KEY_USER);
   if (storedUser) {
     try {
-      const parsed = JSON.parse(storedUser);
-      if (parsed.role === 'admin') {
-        currentUser = parsed;
-      } else if (parsed.role === 'member') {
-        const matchingMember = members.find(m => 
-          m.id === parsed.id || m.username.toLowerCase() === (parsed.username || '').toLowerCase()
-        );
-        if (matchingMember) {
-          currentUser = { ...matchingMember, role: 'member' };
-        } else {
-          currentUser = null;
-        }
-      }
+      currentUser = JSON.parse(storedUser);
     } catch (e) {
       currentUser = null;
     }
   }
 
   applyAuthState();
+
+  // Connect to live central database in background
+  await checkDatabaseConnection();
 }
 
 function switchAuthTab(tab) {
@@ -422,7 +558,8 @@ function toggleInputPassword(inputId, btn) {
   }
 }
 
-function handleLogin(event) {
+// Sign In with Live Database verification
+async function handleLogin(event) {
   event.preventDefault();
   const username = (document.getElementById('login-username').value || '').trim();
   const password = (document.getElementById('login-password').value || '').trim();
@@ -432,7 +569,31 @@ function handleLogin(event) {
     return;
   }
 
-  // 1. Check Admin Login (admin / 123)
+  // If server database is online, authenticate against central database
+  if (isServerConnected) {
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        currentUser = data.user;
+        saveToLocalStorage();
+        applyAuthState();
+        showToast(`Signed in to Central Database as ${currentUser.name}!`, 'success');
+        return;
+      } else {
+        showToast(data.message || 'Invalid username or password.', 'error');
+        return;
+      }
+    } catch (err) {
+      console.warn('API error, falling back to local verification', err);
+    }
+  }
+
+  // Local verification fallback
   if (username.toLowerCase() === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
     currentUser = {
       role: 'admin',
@@ -440,14 +601,12 @@ function handleLogin(event) {
       name: ADMIN_CREDENTIALS.name,
       email: ADMIN_CREDENTIALS.email
     };
-    saveData();
+    saveToLocalStorage();
     applyAuthState();
     showToast(`Welcome back, Administrator!`, 'success');
-    logActivity('Admin signed in to management console', 'system');
     return;
   }
 
-  // 2. Check Member Login (case-insensitive username match, exact password match)
   const member = members.find(m => 
     (m.username || '').toLowerCase() === username.toLowerCase() && 
     (m.password || '') === password
@@ -455,26 +614,21 @@ function handleLogin(event) {
 
   if (member) {
     if (member.status === 'Suspended') {
-      showToast('Your account is currently suspended. Please contact the library administrator.', 'error');
+      showToast('Your account is suspended. Contact administrator.', 'error');
       return;
     }
-
-    currentUser = {
-      ...member,
-      role: 'member'
-    };
-    saveData();
+    currentUser = { ...member, role: 'member' };
+    saveToLocalStorage();
     applyAuthState();
     showToast(`Welcome back, ${member.name}!`, 'success');
-    logActivity(`Member '${member.name}' (${member.username}) signed in`, 'member');
     return;
   }
 
-  showToast('Invalid username or password. Check credentials and try again.', 'error');
+  showToast('Invalid username or password.', 'error');
 }
 
-// Self-Registration for New Members
-function handleRegister(event) {
+// Member Registration saved to Central Database
+async function handleRegister(event) {
   event.preventDefault();
 
   const name = (document.getElementById('reg-name').value || '').trim();
@@ -489,10 +643,44 @@ function handleRegister(event) {
     return;
   }
 
-  // Check username uniqueness
+  const payload = {
+    name,
+    username,
+    password,
+    email: email || `${username}@library.org`,
+    phone: phone || '+1 555-0199',
+    tier
+  };
+
+  // If server is connected, send to database API
+  if (isServerConnected) {
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        currentUser = data.user;
+        document.getElementById('form-register').reset();
+        await syncWithServerDatabase(true);
+        applyAuthState();
+        showToast(`Account registered in Central Database! Welcome, ${name}!`, 'success');
+        return;
+      } else {
+        showToast(data.message || 'Registration error', 'error');
+        return;
+      }
+    } catch (err) {
+      console.warn('API error, falling back to local', err);
+    }
+  }
+
+  // Local fallback
   const cleanUsername = username.toLowerCase();
   if (cleanUsername === 'admin' || members.some(m => (m.username || '').toLowerCase() === cleanUsername)) {
-    showToast(`Username '${username}' is already taken. Please choose another username.`, 'error');
+    showToast(`Username '${username}' is taken. Please choose another.`, 'error');
     return;
   }
 
@@ -510,23 +698,17 @@ function handleRegister(event) {
     joinDate: new Date().toISOString().split('T')[0]
   };
 
-  // Add to members list and persist immediately
   members.push(newMember);
   currentUser = { ...newMember, role: 'member' };
-  
-  saveData();
-  logActivity(`New member registered account: ${name} (User: ${username})`, 'member');
-
-  // Reset form
+  saveToLocalStorage();
   document.getElementById('form-register').reset();
-
   applyAuthState();
-  showToast(`Account created successfully! Welcome to Alexandria, ${name}!`, 'success');
+  showToast(`Account created! (Local mode) Welcome, ${name}!`, 'success');
 }
 
 function handleLogout() {
   currentUser = null;
-  saveData();
+  saveToLocalStorage();
   applyAuthState();
   showToast('You have signed out successfully.', 'info');
 }
@@ -548,7 +730,6 @@ function applyAuthState() {
 
   const isAdmin = currentUser.role === 'admin';
 
-  // Toggle admin-only controls
   document.querySelectorAll('.admin-only').forEach(el => {
     if (isAdmin) {
       el.classList.remove('hidden');
@@ -557,7 +738,6 @@ function applyAuthState() {
     }
   });
 
-  // User badge and sidebar
   const userRoleEl = document.getElementById('sidebar-user-role');
   const userNameEl = document.getElementById('sidebar-user-name');
   const userAvatarEl = document.getElementById('sidebar-user-avatar');
@@ -578,7 +758,7 @@ function applyAuthState() {
     userRoleEl.innerText = `${currentUser.tier} Patron`;
     userRoleEl.className = "text-[11px] text-emerald-400 font-semibold";
     userNameEl.innerText = currentUser.name;
-    const initials = currentUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+    const initials = (currentUser.name || 'Member').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
     userAvatarEl.innerHTML = `<span>${initials}</span>`;
     topBadgeEl.innerHTML = `<i class="fa-solid fa-id-card text-emerald-500 mr-1"></i> Member: ${currentUser.name} (${currentUser.tier})`;
     topBadgeEl.className = "px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-900 border border-emerald-200";
@@ -592,7 +772,7 @@ function applyAuthState() {
 }
 
 // ==========================================
-// 4. NAVIGATION & VIEWS
+// 5. NAVIGATION & VIEW SWITCHING
 // ==========================================
 
 function switchView(viewName) {
@@ -628,7 +808,7 @@ function switchView(viewName) {
   const titleMap = {
     'dashboard': { 
       title: isAdmin ? "System Dashboard" : "Patron Dashboard", 
-      subtitle: isAdmin ? "Catalog overview, active scholar statistics, and operations" : "Your active book loans, personal reading list, and discovery" 
+      subtitle: isAdmin ? "Live database catalog overview and active scholar statistics" : "Your active book loans, personal reading list, and discovery" 
     },
     'books': { 
       title: "Books Catalog", 
@@ -653,13 +833,16 @@ function switchView(viewName) {
     document.getElementById('page-subtitle').innerText = titleMap[viewName].subtitle;
   }
 
-  if (viewName === 'dashboard') renderDashboard();
-  if (viewName === 'books') renderBooks();
-  if (viewName === 'members') renderMembers();
-  if (viewName === 'circulation') renderCirculation();
-  if (viewName === 'library-info') renderLibraryProfile();
-
+  renderCurrentView();
   updateBadges();
+}
+
+function renderCurrentView() {
+  if (currentView === 'dashboard') renderDashboard();
+  if (currentView === 'books') renderBooks();
+  if (currentView === 'members') renderMembers();
+  if (currentView === 'circulation') renderCirculation();
+  if (currentView === 'library-info') renderLibraryProfile();
 }
 
 function toggleMobileMenu() {
@@ -699,7 +882,7 @@ function updateBadges() {
 }
 
 // ==========================================
-// 5. DASHBOARD VIEW
+// 6. DASHBOARD VIEW
 // ==========================================
 
 function renderDashboard() {
@@ -745,7 +928,6 @@ function renderDashboard() {
     document.getElementById('dash-loans-heading').innerText = "My Borrowed Books";
   }
 
-  // Recent Books
   const recentBooksContainer = document.getElementById('dash-recent-books');
   recentBooksContainer.innerHTML = '';
   const recentList = [...books].reverse().slice(0, 4);
@@ -774,7 +956,6 @@ function renderDashboard() {
     recentBooksContainer.appendChild(card);
   });
 
-  // Active Loans mini list
   const activeLoansContainer = document.getElementById('dash-active-loans');
   activeLoansContainer.innerHTML = '';
 
@@ -804,7 +985,6 @@ function renderDashboard() {
     });
   }
 
-  // Activity Log
   const logContainer = document.getElementById('dash-activity-log');
   logContainer.innerHTML = '';
   logs.slice(0, 5).forEach(log => {
@@ -850,7 +1030,7 @@ function generateProceduralCoverHtml(book) {
 }
 
 // ==========================================
-// 6. BOOKS CATALOG (WITH COVER IMAGE CONTROLS)
+// 7. BOOKS CATALOG (WITH COVER CONTROLS)
 // ==========================================
 
 function renderBooks() {
@@ -979,7 +1159,6 @@ function renderBooks() {
     });
 
   } else {
-    // Table View
     gridContainer.classList.add('hidden');
     tableContainer.classList.remove('hidden');
     tableBody.innerHTML = '';
@@ -1075,7 +1254,7 @@ function handleBookImageFile(event) {
   if (!file) return;
 
   if (!file.type.startsWith('image/')) {
-    showToast('Please select a valid image file (JPG, PNG, WebP).', 'error');
+    showToast('Please select a valid image file.', 'error');
     return;
   }
 
@@ -1088,7 +1267,7 @@ function handleBookImageFile(event) {
   reader.onload = function(e) {
     setBookModalImage(e.target.result);
     document.getElementById('book-url-input').value = '';
-    showToast('Cover image loaded successfully!', 'success');
+    showToast('Cover image loaded!', 'success');
   };
   reader.readAsDataURL(file);
 }
@@ -1133,10 +1312,11 @@ function removeBookImage() {
   document.getElementById('btn-remove-image').classList.add('hidden');
   document.getElementById('book-file-input').value = '';
   document.getElementById('book-url-input').value = '';
-  showToast('Book cover image removed. Standard academic cover will be used.', 'info');
+  showToast('Cover removed. Academic procedural spine will be used.', 'info');
 }
 
-function handleSaveBook(event) {
+// Add or Edit Book with Live Database Sync
+async function handleSaveBook(event) {
   event.preventDefault();
 
   const id = document.getElementById('book-form-id').value;
@@ -1151,63 +1331,74 @@ function handleSaveBook(event) {
   const desc = document.getElementById('book-input-desc').value.trim();
 
   if (!title || !author || !category) {
-    showToast('Please fill in all mandatory book information.', 'error');
+    showToast('Please fill in Title, Author, and Category.', 'error');
     return;
   }
 
+  const payload = {
+    title,
+    author,
+    category,
+    isbn,
+    year,
+    copies,
+    location,
+    publisher,
+    description: desc,
+    coverImage: currentModalCoverImage || ''
+  };
+
+  // If connected to central database
+  if (isServerConnected) {
+    try {
+      const endpoint = id ? `${API_BASE}/api/books/${id}` : `${API_BASE}/api/books`;
+      const method = id ? 'PUT' : 'POST';
+      const res = await fetch(endpoint, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        await syncWithServerDatabase(true);
+        closeModal('modal-add-book');
+        showToast(`Book saved to Central Database across all devices!`, 'success');
+        return;
+      }
+    } catch (err) {
+      console.warn('API error, saving locally', err);
+    }
+  }
+
+  // Local fallback
   if (id) {
     const index = books.findIndex(b => b.id === id);
     if (index !== -1) {
       const existing = books[index];
-      const difference = copies - existing.copies;
-      const newAvailable = Math.max(0, existing.available + difference);
-
+      const diff = copies - existing.copies;
       books[index] = {
         ...existing,
-        title,
-        author,
-        category,
-        isbn,
-        year,
-        copies,
-        available: newAvailable,
-        location,
-        publisher,
-        description: desc,
-        coverImage: currentModalCoverImage || ''
+        ...payload,
+        available: Math.max(0, existing.available + diff)
       };
-
-      logActivity(`Updated volume '${title}' (Cover ${currentModalCoverImage ? 'updated' : 'removed/default'})`, 'book');
-      showToast(`Book '${title}' updated successfully!`, 'success');
+      logActivity(`Updated volume '${title}'`, 'book');
     }
   } else {
-    const newId = `BK-${1000 + books.length + 1}`;
     const newBook = {
-      id: newId,
-      title,
-      author,
-      category,
-      isbn,
-      year,
-      copies,
-      available: copies,
-      location,
-      publisher,
-      description: desc,
-      coverImage: currentModalCoverImage || ''
+      id: `BK-${1000 + books.length + 1}`,
+      ...payload,
+      available: copies
     };
-
     books.push(newBook);
-    logActivity(`Cataloged new book '${title}' by ${author}`, 'book');
-    showToast(`New book '${title}' cataloged into Alexandria!`, 'success');
+    logActivity(`Cataloged new book '${title}'`, 'book');
   }
 
-  saveData();
+  saveToLocalStorage();
   closeModal('modal-add-book');
   populateCategoryFilter();
   renderBooks();
   renderDashboard();
   updateBadges();
+  showToast(`Book saved locally!`, 'success');
 }
 
 function openEditBookModal(bookId) {
@@ -1290,7 +1481,7 @@ function confirmDeleteBook(bookId) {
 
   const activeLoansForBook = loans.filter(l => l.bookId === bookId && !l.returnDate);
   if (activeLoansForBook.length > 0) {
-    showToast(`Cannot remove '${book.title}'. ${activeLoansForBook.length} copy is currently checked out!`, 'error');
+    showToast(`Cannot delete '${book.title}'. ${activeLoansForBook.length} copy is currently checked out!`, 'error');
     return;
   }
 
@@ -1301,17 +1492,17 @@ function confirmDeleteBook(bookId) {
   };
 
   document.getElementById('delete-confirm-title').innerText = "Remove Book from Catalog";
-  document.getElementById('delete-confirm-desc').innerText = `Are you sure you want to permanently delete "${book.title}" from the library system?`;
+  document.getElementById('delete-confirm-desc').innerText = `Are you sure you want to permanently delete "${book.title}" from the database?`;
   
   closeModal('modal-book-details');
   openModal('modal-confirm-delete');
 }
 
 // ==========================================
-// 7. MEMBERS MANAGEMENT & CREDENTIALS (ADMIN)
+// 8. MEMBERS & CREDENTIALS (ADMIN MANAGE)
 // ==========================================
 
-function handleSaveMember(event) {
+async function handleSaveMember(event) {
   event.preventDefault();
 
   const id = document.getElementById('member-form-id').value;
@@ -1329,66 +1520,78 @@ function handleSaveMember(event) {
     return;
   }
 
-  // Safe username uniqueness check
-  const cleanUsername = username.toLowerCase();
-  const duplicate = members.find(m => 
-    (m.username || '').toLowerCase() === cleanUsername && m.id !== id
-  );
+  const payload = {
+    name,
+    username,
+    password,
+    email: email || `${username}@library.org`,
+    phone: phone || '+1 555-0100',
+    tier,
+    status,
+    address
+  };
 
+  // If central database is connected
+  if (isServerConnected) {
+    try {
+      const endpoint = id ? `${API_BASE}/api/members/${id}` : `${API_BASE}/api/members`;
+      const method = id ? 'PUT' : 'POST';
+      const res = await fetch(endpoint, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        await syncWithServerDatabase(true);
+        closeModal('modal-add-member');
+        showToast(`Member & credentials saved to Central Database!`, 'success');
+        return;
+      } else {
+        showToast(data.message || 'Error saving member', 'error');
+        return;
+      }
+    } catch (err) {
+      console.warn('API error, saving locally', err);
+    }
+  }
+
+  // Local fallback
+  const cleanUsername = username.toLowerCase();
+  const duplicate = members.find(m => (m.username || '').toLowerCase() === cleanUsername && m.id !== id);
   if (duplicate || cleanUsername === 'admin') {
-    showToast(`Username '${username}' is already in use. Please select a unique username.`, 'error');
+    showToast(`Username '${username}' is already in use.`, 'error');
     return;
   }
 
   if (id) {
-    // Edit existing member
     const index = members.findIndex(m => m.id === id);
     if (index !== -1) {
       members[index] = {
         ...members[index],
-        name: name,
-        username: username,
-        password: password,
-        email: email || members[index].email || `${username}@library.org`,
-        phone: phone || members[index].phone || '+1 555-0100',
-        tier: tier,
-        status: status,
-        address: address || members[index].address || ''
+        ...payload
       };
-
-      // If updating the active logged-in member
       if (currentUser && currentUser.role === 'member' && currentUser.id === id) {
         currentUser = { ...members[index], role: 'member' };
       }
-
-      logActivity(`Admin updated login credentials for ${name} (User: ${username})`, 'member');
-      showToast(`Member profile and login for '${name}' saved successfully!`, 'success');
+      logActivity(`Admin updated member credentials for ${name}`, 'member');
     }
   } else {
-    // Add new member
-    const newId = `MEM-${1000 + members.length + 1}`;
     const newMember = {
-      id: newId,
-      name: name,
-      username: username,
-      password: password,
-      email: email || `${username}@library.org`,
-      phone: phone || '+1 555-0100',
-      tier: tier,
-      status: status,
-      address: address || 'Library Patron',
+      id: `MEM-${1000 + members.length + 1}`,
+      ...payload,
       joinDate: new Date().toISOString().split('T')[0]
     };
     members.push(newMember);
-    logActivity(`Admin enrolled new member with login: ${name} (${username})`, 'member');
-    showToast(`New member '${name}' created with login username '${username}'!`, 'success');
+    logActivity(`Admin enrolled member: ${name} (${username})`, 'member');
   }
 
-  saveData();
+  saveToLocalStorage();
   closeModal('modal-add-member');
   renderMembers();
   renderDashboard();
   updateBadges();
+  showToast(`Member profile and credentials saved!`, 'success');
 }
 
 function openEditMemberModal(memberId) {
@@ -1415,7 +1618,7 @@ function confirmDeleteMember(memberId) {
 
   const activeLoans = loans.filter(l => l.memberId === memberId && !l.returnDate);
   if (activeLoans.length > 0) {
-    showToast(`Cannot remove ${member.name}. They currently hold ${activeLoans.length} unreturned book(s)!`, 'error');
+    showToast(`Cannot remove ${member.name}. They hold ${activeLoans.length} unreturned book(s)!`, 'error');
     return;
   }
 
@@ -1426,7 +1629,7 @@ function confirmDeleteMember(memberId) {
   };
 
   document.getElementById('delete-confirm-title').innerText = "De-enroll Member";
-  document.getElementById('delete-confirm-desc').innerText = `Are you sure you want to remove member account "${member.name}" (${member.id})? Their login will also be deleted.`;
+  document.getElementById('delete-confirm-desc').innerText = `Are you sure you want to remove member "${member.name}" (${member.id})? Their login will also be deleted from the database.`;
 
   openModal('modal-confirm-delete');
 }
@@ -1488,7 +1691,6 @@ function renderMembers() {
       </td>
       <td class="py-3.5 px-4 font-mono text-xs font-semibold text-slate-700">${escapeHtml(member.id)}</td>
       
-      <!-- Admin View & Manage Member Credentials -->
       <td class="py-3.5 px-4 bg-amber-50/40 border-x border-amber-200/50">
         <div class="space-y-1">
           <div class="flex items-center gap-1.5 text-xs">
@@ -1500,10 +1702,10 @@ function renderMembers() {
             <span class="font-mono text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200 text-xs font-semibold">
               ${isPasswordRevealed ? escapeHtml(member.password) : '••••••'}
             </span>
-            <button type="button" onclick="togglePasswordReveal('${member.id}')" title="${isPasswordRevealed ? 'Hide Password' : 'Show Password'}" class="text-amber-700 hover:text-amber-900 p-1">
+            <button type="button" onclick="togglePasswordReveal('${member.id}')" title="${isPasswordRevealed ? 'Hide' : 'Reveal'}" class="text-amber-700 hover:text-amber-900 p-1">
               <i class="fa-regular ${isPasswordRevealed ? 'fa-eye-slash' : 'fa-eye'} text-xs"></i>
             </button>
-            <button type="button" onclick="openEditMemberModal('${member.id}')" title="Change/Manage Password" class="text-indigo-600 hover:text-indigo-800 text-[10px] font-bold underline ml-1">
+            <button type="button" onclick="openEditMemberModal('${member.id}')" title="Change Password" class="text-indigo-600 hover:text-indigo-800 text-[10px] font-bold underline ml-1">
               Edit
             </button>
           </div>
@@ -1565,7 +1767,7 @@ function toggleAllPasswordsReveal() {
 }
 
 // ==========================================
-// 8. CIRCULATION & BORROWING
+// 9. CIRCULATION & BORROWING (LIVE DATABASE)
 // ==========================================
 
 function openIssueBookModal() {
@@ -1608,7 +1810,7 @@ function openIssueBookModal() {
   openModal('modal-issue-book');
 }
 
-function handleIssueBook(event) {
+async function handleIssueBook(event) {
   event.preventDefault();
 
   const bookId = document.getElementById('issue-select-book').value;
@@ -1621,65 +1823,61 @@ function handleIssueBook(event) {
     return;
   }
 
+  const payload = { bookId, memberId, borrowDate, dueDate };
+
+  if (isServerConnected) {
+    try {
+      const res = await fetch(`${API_BASE}/api/loans`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        await syncWithServerDatabase(true);
+        closeModal('modal-issue-book');
+        showToast('Book checked out and synced live across devices!', 'success');
+        return;
+      }
+    } catch (err) {
+      console.warn('API error, issuing locally', err);
+    }
+  }
+
+  // Local fallback
   const book = books.find(b => b.id === bookId);
   const member = members.find(m => m.id === memberId);
 
   if (!book || book.available <= 0) {
-    showToast('Selected volume is currently unavailable.', 'error');
-    return;
-  }
-
-  const memberActiveLoans = loans.filter(l => l.memberId === memberId && !l.returnDate).length;
-  const tierLimits = { 'Student': 3, 'Standard': 5, 'Premium': 10, 'Faculty': 15 };
-  const maxAllowed = tierLimits[member.tier] || 5;
-
-  if (memberActiveLoans >= maxAllowed) {
-    showToast(`Borrowing quota reached! ${member.tier} tier allows max ${maxAllowed} books at a time.`, 'error');
+    showToast('Book is unavailable.', 'error');
     return;
   }
 
   const newLoan = {
     id: `LN-${5000 + loans.length + 1}`,
-    bookId: book.id,
-    memberId: member.id,
-    borrowDate: borrowDate,
-    dueDate: dueDate,
+    bookId,
+    memberId,
+    borrowDate,
+    dueDate,
     returnDate: null,
     status: "Active"
   };
 
   book.available -= 1;
   loans.unshift(newLoan);
+  logActivity(`Issued '${book.title}' to ${member ? member.name : 'Patron'}`, 'loan');
 
-  logActivity(`Issued '${book.title}' to member ${member.name}`, 'loan');
-  showToast(`Book '${book.title}' successfully issued to ${member.name}! Due on ${dueDate}.`, 'success');
-
-  saveData();
+  saveToLocalStorage();
   closeModal('modal-issue-book');
   renderBooks();
   renderCirculation();
   renderDashboard();
   updateBadges();
+  showToast('Book issued successfully!', 'success');
 }
 
-function quickMemberBorrow(bookId) {
+async function quickMemberBorrow(bookId) {
   if (!currentUser || currentUser.role !== 'member') {
     showToast('Please sign in as a member to borrow books.', 'error');
-    return;
-  }
-
-  const book = books.find(b => b.id === bookId);
-  if (!book || book.available <= 0) {
-    showToast('Sorry, this volume is currently out of stock.', 'error');
-    return;
-  }
-
-  const myActiveLoans = loans.filter(l => l.memberId === currentUser.id && !l.returnDate);
-  const tierLimits = { 'Student': 3, 'Standard': 5, 'Premium': 10, 'Faculty': 15 };
-  const maxAllowed = tierLimits[currentUser.tier] || 5;
-
-  if (myActiveLoans.length >= maxAllowed) {
-    showToast(`You have reached your borrowing limit of ${maxAllowed} books for the ${currentUser.tier} tier.`, 'error');
     return;
   }
 
@@ -1687,36 +1885,84 @@ function quickMemberBorrow(bookId) {
   const dueDate = new Date();
   dueDate.setDate(today.getDate() + 14);
 
-  const newLoan = {
-    id: `LN-${5000 + loans.length + 1}`,
-    bookId: book.id,
+  const payload = {
+    bookId: bookId,
     memberId: currentUser.id,
     borrowDate: today.toISOString().split('T')[0],
-    dueDate: dueDate.toISOString().split('T')[0],
+    dueDate: dueDate.toISOString().split('T')[0]
+  };
+
+  if (isServerConnected) {
+    try {
+      const res = await fetch(`${API_BASE}/api/loans`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        await syncWithServerDatabase(true);
+        showToast(`Book borrowed and recorded to Central Database!`, 'success');
+        return;
+      } else {
+        showToast(data.message || 'Cannot borrow book', 'error');
+        return;
+      }
+    } catch (err) {
+      console.warn('API error, borrowing locally', err);
+    }
+  }
+
+  // Local fallback
+  const book = books.find(b => b.id === bookId);
+  if (!book || book.available <= 0) {
+    showToast('Book is out of stock.', 'error');
+    return;
+  }
+
+  const newLoan = {
+    id: `LN-${5000 + loans.length + 1}`,
+    bookId,
+    memberId: currentUser.id,
+    borrowDate: payload.borrowDate,
+    dueDate: payload.dueDate,
     returnDate: null,
     status: "Active"
   };
 
   book.available -= 1;
   loans.unshift(newLoan);
-
   logActivity(`${currentUser.name} borrowed '${book.title}'`, 'loan');
-  showToast(`Success! '${book.title}' has been issued to you. Due on ${dueDate.toISOString().split('T')[0]}.`, 'success');
 
-  saveData();
+  saveToLocalStorage();
   renderBooks();
   renderCirculation();
   renderDashboard();
   updateBadges();
+  showToast(`Book '${book.title}' borrowed successfully!`, 'success');
 }
 
-function handleReturnBook(loanId) {
+async function handleReturnBook(loanId) {
+  if (isServerConnected) {
+    try {
+      const res = await fetch(`${API_BASE}/api/loans/${loanId}/return`, {
+        method: 'POST'
+      });
+      if (res.ok) {
+        await syncWithServerDatabase(true);
+        showToast('Book returned and restocked in Central Database!', 'success');
+        return;
+      }
+    } catch (err) {
+      console.warn('API error, returning locally', err);
+    }
+  }
+
+  // Local fallback
   const loan = loans.find(l => l.id === loanId);
   if (!loan || loan.returnDate) return;
 
   const book = books.find(b => b.id === loan.bookId);
-  const member = members.find(m => m.id === loan.memberId);
-
   loan.returnDate = new Date().toISOString().split('T')[0];
   loan.status = "Returned";
 
@@ -1724,14 +1970,12 @@ function handleReturnBook(loanId) {
     book.available = Math.min(book.copies, book.available + 1);
   }
 
-  logActivity(`Returned volume: '${book ? book.title : 'Book'}' by ${member ? member.name : 'Patron'}`, 'loan');
-  showToast(`Book successfully returned to inventory!`, 'success');
-
-  saveData();
+  saveToLocalStorage();
   renderBooks();
   renderCirculation();
   renderDashboard();
   updateBadges();
+  showToast('Book returned to inventory!', 'success');
 }
 
 function renderCirculation() {
@@ -1803,25 +2047,40 @@ function renderCirculation() {
 }
 
 // ==========================================
-// 9. EXECUTE DELETION & PROFILE
+// 10. DELETIONS, PROFILE & UTILITIES
 // ==========================================
 
-function executeDeletion() {
+async function executeDeletion() {
   if (!activeDeleteTarget) return;
 
   const { type, id, name } = activeDeleteTarget;
 
-  if (type === 'book') {
-    books = books.filter(b => b.id !== id);
-    logActivity(`Removed volume '${name}' (${id}) from catalog`, 'book');
-    showToast(`Book '${name}' deleted successfully.`, 'info');
-  } else if (type === 'member') {
-    members = members.filter(m => m.id !== id);
-    logActivity(`Removed member '${name}' (${id}) from library registry`, 'member');
-    showToast(`Member account '${name}' removed.`, 'info');
+  if (isServerConnected) {
+    try {
+      const endpoint = type === 'book' ? `${API_BASE}/api/books/${id}` : `${API_BASE}/api/members/${id}`;
+      const res = await fetch(endpoint, { method: 'DELETE' });
+      if (res.ok) {
+        await syncWithServerDatabase(true);
+        closeModal('modal-confirm-delete');
+        activeDeleteTarget = null;
+        showToast(`Record '${name}' deleted from Central Database!`, 'info');
+        return;
+      }
+    } catch (err) {
+      console.warn('API error, deleting locally', err);
+    }
   }
 
-  saveData();
+  // Local fallback
+  if (type === 'book') {
+    books = books.filter(b => b.id !== id);
+    logActivity(`Removed volume '${name}'`, 'book');
+  } else if (type === 'member') {
+    members = members.filter(m => m.id !== id);
+    logActivity(`Removed member '${name}'`, 'member');
+  }
+
+  saveToLocalStorage();
   closeModal('modal-confirm-delete');
   activeDeleteTarget = null;
   populateCategoryFilter();
@@ -1829,6 +2088,7 @@ function executeDeletion() {
   renderMembers();
   renderDashboard();
   updateBadges();
+  showToast(`Record removed.`, 'info');
 }
 
 function renderLibraryProfile() {
@@ -1856,21 +2116,41 @@ function openEditLibraryModal() {
   openModal('modal-edit-library');
 }
 
-function handleSaveLibraryProfile(event) {
+async function handleSaveLibraryProfile(event) {
   event.preventDefault();
 
-  libraryProfile.name = document.getElementById('lib-edit-name').value.trim();
-  libraryProfile.librarian = document.getElementById('lib-edit-librarian').value.trim();
-  libraryProfile.hours = document.getElementById('lib-edit-hours').value.trim();
-  libraryProfile.address = document.getElementById('lib-edit-address').value.trim();
-  libraryProfile.phone = document.getElementById('lib-edit-phone').value.trim();
-  libraryProfile.email = document.getElementById('lib-edit-email').value.trim();
+  const updates = {
+    name: document.getElementById('lib-edit-name').value.trim(),
+    librarian: document.getElementById('lib-edit-librarian').value.trim(),
+    hours: document.getElementById('lib-edit-hours').value.trim(),
+    address: document.getElementById('lib-edit-address').value.trim(),
+    phone: document.getElementById('lib-edit-phone').value.trim(),
+    email: document.getElementById('lib-edit-email').value.trim()
+  };
 
-  saveData();
+  if (isServerConnected) {
+    try {
+      const res = await fetch(`${API_BASE}/api/profile`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+      if (res.ok) {
+        await syncWithServerDatabase(true);
+        closeModal('modal-edit-library');
+        showToast('Library details saved to Central Database!', 'success');
+        return;
+      }
+    } catch (err) {
+      console.warn('API error, saving profile locally', err);
+    }
+  }
+
+  libraryProfile = { ...libraryProfile, ...updates };
+  saveToLocalStorage();
   closeModal('modal-edit-library');
   renderLibraryProfile();
-  logActivity('Updated Library Institutional Profile', 'system');
-  showToast('Library details updated successfully!', 'success');
+  showToast('Library details updated!', 'success');
 }
 
 function exportData() {
@@ -1888,12 +2168,12 @@ function exportData() {
   const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportPayload, null, 2));
   const downloadAnchor = document.createElement('a');
   downloadAnchor.setAttribute("href", dataStr);
-  downloadAnchor.setAttribute("download", `alexandria_library_backup_${new Date().toISOString().slice(0,10)}.json`);
+  downloadAnchor.setAttribute("download", `alexandria_central_db_backup_${new Date().toISOString().slice(0,10)}.json`);
   document.body.appendChild(downloadAnchor);
   downloadAnchor.click();
   downloadAnchor.remove();
 
-  showToast('Library database backup exported as JSON!', 'success');
+  showToast('Database backup downloaded!', 'success');
 }
 
 function importData(event) {
@@ -1911,7 +2191,7 @@ function importData(event) {
         if (data.profile) libraryProfile = data.profile;
         if (data.logs) logs = data.logs;
 
-        saveData();
+        saveToLocalStorage();
         renderBooks();
         renderMembers();
         renderCirculation();
@@ -1919,26 +2199,35 @@ function importData(event) {
         renderLibraryProfile();
         populateCategoryFilter();
         updateBadges();
-        showToast('Library database restored successfully from JSON file!', 'success');
-      } else {
-        showToast('Invalid backup file structure.', 'error');
+        showToast('Database restored successfully!', 'success');
       }
     } catch (err) {
-      showToast('Error reading backup file: ' + err.message, 'error');
+      showToast('Error reading backup: ' + err.message, 'error');
     }
   };
   reader.readAsText(file);
 }
 
-function resetToSampleData() {
-  if (confirm("Reset library to original demo catalog and member accounts?")) {
+async function resetToSampleData() {
+  if (confirm("Reset Central Database to original demo catalog and member accounts?")) {
+    if (isServerConnected) {
+      try {
+        const res = await fetch(`${API_BASE}/api/reset`, { method: 'POST' });
+        if (res.ok) {
+          await syncWithServerDatabase(true);
+          showToast('Central Database reset across all devices!', 'info');
+          return;
+        }
+      } catch (err) {}
+    }
+
     books = [...DEFAULT_BOOKS];
     members = [...DEFAULT_MEMBERS];
     loans = [...DEFAULT_LOANS];
     logs = [...DEFAULT_LOGS];
     libraryProfile = { ...DEFAULT_PROFILE };
 
-    saveData();
+    saveToLocalStorage();
     renderBooks();
     renderMembers();
     renderCirculation();
@@ -1946,13 +2235,9 @@ function resetToSampleData() {
     renderLibraryProfile();
     populateCategoryFilter();
     updateBadges();
-    showToast('Library restored to default records.', 'info');
+    showToast('Restored default records.', 'info');
   }
 }
-
-// ==========================================
-// 10. MODAL & UTILITY FUNCTIONS
-// ==========================================
 
 function openModal(modalId) {
   const modal = document.getElementById(modalId);
