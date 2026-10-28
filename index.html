@@ -52,9 +52,9 @@
           <i class="fa-solid fa-book-bookmark"></i>
         </div>
         <h1 class="text-2xl font-bold font-serif tracking-tight">Alexandria Library</h1>
-        <p class="text-xs text-slate-400 mt-1">Sign in to access your library account</p>
+        <p class="text-xs text-slate-400 mt-1">Institutional Portal & Catalog Access</p>
 
-        <!-- Decorative background shape -->
+        <!-- Decorative background icon -->
         <div class="absolute -right-6 -bottom-6 opacity-10 text-7xl text-white pointer-events-none">
           <i class="fa-solid fa-landmark"></i>
         </div>
@@ -65,29 +65,29 @@
         <button id="tab-btn-login" onclick="switchAuthTab('login')" class="flex-1 py-3 text-center border-b-2 border-indigo-600 text-indigo-700 bg-white font-bold transition">
           <i class="fa-solid fa-arrow-right-to-bracket mr-1.5"></i> Sign In
         </button>
-        <button id="tab-btn-register" onclick="switchAuthTab('register')" class="flex-1 py-3 text-center border-b-2 border-transparent hover:text-slate-900 transition">
+        <button id="tab-btn-register" onclick="switchAuthTab('register')" class="flex-1 py-3 text-center border-b-2 border-transparent text-slate-600 hover:text-slate-900 transition">
           <i class="fa-solid fa-user-plus mr-1.5"></i> Member Sign Up
         </button>
       </div>
 
       <!-- Quick Credentials Hint Box -->
-      <div class="mx-6 mt-4 p-3.5 rounded-xl bg-amber-50/80 border border-amber-200/80 text-[11px] text-amber-900 space-y-1.5">
+      <div class="mx-6 mt-4 p-3.5 rounded-xl bg-amber-50/90 border border-amber-200 text-[11px] text-amber-950 space-y-1.5">
         <p class="font-bold flex items-center gap-1.5 text-amber-950">
-          <i class="fa-solid fa-key text-amber-600"></i> Quick Login Credentials:
+          <i class="fa-solid fa-key text-amber-600"></i> Click to Auto-Fill Login Credentials:
         </p>
         <div class="grid grid-cols-2 gap-2 pt-1 border-t border-amber-200/60">
-          <div class="cursor-pointer hover:bg-amber-100/60 p-1 rounded transition" onclick="quickFillCredentials('admin', '123')">
-            <span class="font-bold text-indigo-900 block"><i class="fa-solid fa-user-shield text-indigo-600"></i> Admin Login:</span>
-            User: <code class="font-bold">admin</code> | Pass: <code class="font-bold">123</code>
+          <div class="cursor-pointer hover:bg-amber-100/70 p-1.5 rounded-lg border border-amber-200/50 bg-white/70 transition" onclick="quickFillCredentials('admin', '123')">
+            <span class="font-bold text-indigo-900 block"><i class="fa-solid fa-user-shield text-indigo-600"></i> Admin:</span>
+            User: <code class="font-bold text-slate-800">admin</code><br>Pass: <code class="font-bold text-slate-800">123</code>
           </div>
-          <div class="cursor-pointer hover:bg-amber-100/60 p-1 rounded transition" onclick="quickFillCredentials('marcus', '123')">
-            <span class="font-bold text-emerald-900 block"><i class="fa-solid fa-user text-emerald-600"></i> Member Login:</span>
-            User: <code class="font-bold">marcus</code> | Pass: <code class="font-bold">123</code>
+          <div class="cursor-pointer hover:bg-amber-100/70 p-1.5 rounded-lg border border-amber-200/50 bg-white/70 transition" onclick="quickFillCredentials('marcus', '123')">
+            <span class="font-bold text-emerald-900 block"><i class="fa-solid fa-user text-emerald-600"></i> Member:</span>
+            User: <code class="font-bold text-slate-800">marcus</code><br>Pass: <code class="font-bold text-slate-800">123</code>
           </div>
         </div>
       </div>
 
-      <!-- Form 1: Login Form -->
+      <!-- Form 1: Sign In -->
       <form id="form-login" onsubmit="handleLogin(event)" class="p-6 space-y-4">
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Username</label>
@@ -115,7 +115,7 @@
         </button>
       </form>
 
-      <!-- Form 2: Member Self-Registration Form -->
+      <!-- Form 2: Member Self-Registration -->
       <form id="form-register" onsubmit="handleRegister(event)" class="hidden p-6 space-y-3.5">
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Full Legal Name <span class="text-rose-500">*</span></label>
@@ -123,28 +123,33 @@
                  class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label class="block text-xs font-bold text-slate-700 mb-1">Choose Username <span class="text-rose-500">*</span></label>
-            <input type="text" id="reg-username" required placeholder="davidm" 
+            <input type="text" id="reg-username" required placeholder="e.g. davidm" 
                    class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
           </div>
           <div>
             <label class="block text-xs font-bold text-slate-700 mb-1">Choose Password <span class="text-rose-500">*</span></label>
-            <input type="password" id="reg-password" required placeholder="Create password" 
-                   class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
+            <div class="relative">
+              <input type="password" id="reg-password" required placeholder="Create password" 
+                     class="w-full pl-3 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
+              <button type="button" onclick="toggleInputPassword('reg-password', this)" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                <i class="fa-regular fa-eye text-xs"></i>
+              </button>
+            </div>
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1">Email Address <span class="text-rose-500">*</span></label>
-            <input type="email" id="reg-email" required placeholder="david@example.com" 
+            <label class="block text-xs font-bold text-slate-700 mb-1">Email <span class="text-slate-400 font-normal">(Optional)</span></label>
+            <input type="email" id="reg-email" placeholder="david@example.com" 
                    class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
           </div>
           <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1">Phone Number <span class="text-rose-500">*</span></label>
-            <input type="tel" id="reg-phone" required placeholder="+1 555-0199" 
+            <label class="block text-xs font-bold text-slate-700 mb-1">Phone <span class="text-slate-400 font-normal">(Optional)</span></label>
+            <input type="tel" id="reg-phone" placeholder="+1 555-0199" 
                    class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
           </div>
         </div>
@@ -152,20 +157,26 @@
         <div>
           <label class="block text-xs font-bold text-slate-700 mb-1">Membership Tier</label>
           <select id="reg-tier" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
-            <option value="Student">Student (3 books loan quota)</option>
             <option value="Standard" selected>Standard Reader (5 books quota)</option>
+            <option value="Student">Student (3 books quota)</option>
             <option value="Premium">Scholar / Premium (10 books quota)</option>
             <option value="Faculty">Faculty & Staff (15 books quota)</option>
           </select>
         </div>
 
         <button type="submit" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-emerald-600/20 transition active:scale-95 flex items-center justify-center gap-2 mt-2">
-          <i class="fa-solid fa-user-plus"></i> Create Member Account
+          <i class="fa-solid fa-user-plus"></i> Create Member Account & Sign In
         </button>
+
+        <div class="text-center pt-2">
+          <button type="button" onclick="switchAuthTab('login')" class="text-xs text-indigo-600 hover:underline">
+            Already have an account? Sign in
+          </button>
+        </div>
       </form>
 
       <div class="p-4 bg-slate-50 border-t border-slate-100 text-center text-xs text-slate-500">
-        Alexandria Library System • Multi-user Authentication
+        Alexandria Library System • Credentials are fully manageable by Admin
       </div>
     </div>
   </div>
@@ -215,7 +226,7 @@
             <span id="badge-total-members" class="text-xs bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full">0</span>
           </button>
 
-          <!-- Circulation: Shown to Admin and Members (labeled accordingly) -->
+          <!-- Circulation: Shown to Admin and Members -->
           <button onclick="switchView('circulation')" id="nav-circulation" class="nav-btn w-full flex items-center justify-between px-4 py-3 rounded-xl transition text-slate-400 hover:text-white hover:bg-slate-800/50">
             <div class="flex items-center gap-3.5">
               <i class="fa-solid fa-arrow-right-arrow-left w-5 text-cyan-400"></i>
@@ -371,7 +382,6 @@
               </div>
             </div>
 
-            <!-- Card 2: Changes depending on Admin vs Member -->
             <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
               <div class="space-y-1">
                 <span class="text-xs font-semibold uppercase tracking-wider text-slate-400" id="dash-kpi2-title">Registered Members</span>
@@ -418,29 +428,21 @@
                   Browse Catalog <i class="fa-solid fa-arrow-right text-[10px]"></i>
                 </button>
               </div>
-              <div id="dash-recent-books" class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <!-- Rendered via JS -->
-              </div>
+              <div id="dash-recent-books" class="grid grid-cols-2 sm:grid-cols-4 gap-4"></div>
             </div>
 
             <div class="space-y-6">
-              <!-- Active Loans Box -->
               <div class="bg-white rounded-2xl border border-slate-200/80 p-6 space-y-4">
                 <div class="flex items-center justify-between">
                   <h4 class="font-bold text-slate-900 text-base" id="dash-loans-heading">Active Loans</h4>
                   <button onclick="switchView('circulation')" class="text-xs text-indigo-600 hover:text-indigo-800 font-semibold">View All</button>
                 </div>
-                <div id="dash-active-loans" class="space-y-3">
-                  <!-- Rendered dynamically -->
-                </div>
+                <div id="dash-active-loans" class="space-y-3"></div>
               </div>
 
-              <!-- Activity Log (Admin only or General) -->
               <div class="bg-white rounded-2xl border border-slate-200/80 p-6 space-y-3">
                 <h4 class="font-bold text-slate-900 text-base">Activity Highlights</h4>
-                <ul id="dash-activity-log" class="text-xs space-y-3 text-slate-600">
-                  <!-- Activity items -->
-                </ul>
+                <ul id="dash-activity-log" class="text-xs space-y-3 text-slate-600"></ul>
               </div>
             </div>
           </div>
@@ -450,17 +452,14 @@
         <!-- VIEW 2: BOOKS CATALOG -->
         <!-- ========================================== -->
         <section id="view-books" class="hidden space-y-6">
-          <!-- Filter and Search Bar -->
           <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
             <div class="flex flex-col sm:flex-row gap-4 items-center justify-between">
-              <!-- Search Input -->
               <div class="relative w-full sm:w-96">
                 <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
                 <input type="text" id="book-search-input" oninput="filterBooks()" placeholder="Search by title, author, or ISBN..." 
                        class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition">
               </div>
 
-              <!-- Right Controls -->
               <div class="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end">
                 <select id="book-category-filter" onchange="filterBooks()" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium text-slate-700 focus:outline-none focus:border-indigo-500">
                   <option value="ALL">All Categories</option>
@@ -472,7 +471,6 @@
                   <option value="UNAVAILABLE">Checked Out / None</option>
                 </select>
 
-                <!-- Grid vs Table -->
                 <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
                   <button onclick="setBookView('grid')" id="btn-book-view-grid" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white text-indigo-700 shadow-xs transition">
                     <i class="fa-solid fa-grip"></i>
@@ -482,24 +480,20 @@
                   </button>
                 </div>
 
-                <!-- Admin Only Add Book Button -->
                 <button onclick="openModal('modal-add-book')" class="admin-only bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition">
                   <i class="fa-solid fa-plus"></i> Add Book
                 </button>
               </div>
             </div>
 
-            <!-- Showing Count -->
             <div class="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
               <span>Showing <strong id="books-showing-count" class="text-slate-800">0</strong> cataloged volumes</span>
               <span class="text-slate-400">Click any book card to inspect metadata, cover image, or borrow</span>
             </div>
           </div>
 
-          <!-- Books Grid Container -->
           <div id="books-grid-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div>
 
-          <!-- Books Table Container -->
           <div id="books-table-container" class="hidden bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-xs">
             <div class="overflow-x-auto">
               <table class="w-full text-left text-sm text-slate-600">
@@ -518,7 +512,6 @@
             </div>
           </div>
 
-          <!-- Empty state -->
           <div id="books-empty-state" class="hidden py-16 text-center space-y-3 bg-white rounded-2xl border border-dashed border-slate-300">
             <div class="w-14 h-14 mx-auto rounded-full bg-slate-100 text-slate-400 flex items-center justify-center text-2xl">
               <i class="fa-solid fa-book-open"></i>
@@ -562,8 +555,13 @@
                   <tr>
                     <th class="py-3.5 px-4">Member Info</th>
                     <th class="py-3.5 px-4">Member ID</th>
-                    <th class="py-3.5 px-4 bg-amber-50/70 text-amber-900 border-x border-amber-200/60">
-                      <i class="fa-solid fa-key mr-1 text-amber-600"></i> Login Username & Password (Admin Manage)
+                    <th class="py-3.5 px-4 bg-amber-50/70 text-amber-900 border-x border-amber-200/60 min-w-[220px]">
+                      <div class="flex items-center justify-between">
+                        <span><i class="fa-solid fa-key mr-1 text-amber-600"></i> Member Credentials</span>
+                        <button type="button" onclick="toggleAllPasswordsReveal()" class="text-[10px] text-indigo-700 hover:text-indigo-900 font-bold bg-white px-2 py-0.5 rounded border border-amber-300 shadow-xs transition">
+                          <span id="btn-reveal-all-text">Show All</span>
+                        </button>
+                      </div>
                     </th>
                     <th class="py-3.5 px-4">Tier / Category</th>
                     <th class="py-3.5 px-4">Contact</th>
@@ -599,7 +597,6 @@
             </button>
           </div>
 
-          <!-- Loans Table -->
           <div class="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-xs">
             <div class="overflow-x-auto">
               <table class="w-full text-left text-sm text-slate-600">
@@ -689,7 +686,6 @@
             </div>
           </div>
 
-          <!-- Data Backup & Reset Controls -->
           <div class="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-8 space-y-4 shadow-xs">
             <h3 class="text-base font-bold text-slate-900">System Data Management & Persistence</h3>
             <p class="text-xs text-slate-500">Your books, members, login credentials, cover images, and loan registries are stored safely in local browser storage.</p>
@@ -737,7 +733,6 @@
         <input type="hidden" id="book-form-id">
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <!-- Image Column -->
           <div class="md:col-span-1 space-y-3">
             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">
               Book Cover Image
@@ -759,7 +754,6 @@
               </div>
             </div>
 
-            <!-- Upload File -->
             <div>
               <label class="w-full py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl cursor-pointer flex items-center justify-center gap-2 border border-slate-200 transition">
                 <i class="fa-solid fa-cloud-arrow-up text-indigo-600"></i> Upload Image File
@@ -767,20 +761,17 @@
               </label>
             </div>
 
-            <!-- URL input -->
             <div>
               <div class="text-[11px] text-slate-400 text-center mb-1">— or use Image URL —</div>
               <input type="url" id="book-url-input" oninput="handleBookImageUrl(this.value)" placeholder="https://example.com/cover.jpg" 
                      class="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500">
             </div>
 
-            <!-- Dedicated Remove Button -->
             <button type="button" id="btn-remove-image" onclick="removeBookImage()" class="w-full py-1.5 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-lg font-medium transition hidden flex items-center justify-center gap-1.5">
               <i class="fa-solid fa-trash-can"></i> Remove Current Image
             </button>
           </div>
 
-          <!-- Metadata Fields -->
           <div class="md:col-span-2 space-y-4">
             <div>
               <label class="block text-xs font-semibold text-slate-700 mb-1">Book Title <span class="text-rose-500">*</span></label>
@@ -884,8 +875,8 @@
                  class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
         </div>
 
-        <!-- Login Credentials (View and Manageable by Admin) -->
-        <div class="p-3.5 bg-amber-50/70 border border-amber-200/80 rounded-xl space-y-3">
+        <!-- Login Credentials Managed by Admin -->
+        <div class="p-4 bg-amber-50/80 border border-amber-200/90 rounded-2xl space-y-3">
           <span class="text-xs font-bold text-amber-950 flex items-center gap-1.5">
             <i class="fa-solid fa-key text-amber-600"></i> Member Login Credentials (Admin Can View & Edit)
           </span>
@@ -897,23 +888,22 @@
             </div>
             <div>
               <label class="block text-[11px] font-semibold text-slate-700 mb-1">Login Password <span class="text-rose-500">*</span></label>
-              <div class="relative">
-                <input type="text" id="member-input-password" required placeholder="e.g. pass123" 
-                       class="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
-              </div>
+              <input type="text" id="member-input-password" required placeholder="e.g. pass123" 
+                     class="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
             </div>
           </div>
+          <p class="text-[10px] text-amber-800">Admin can change this member's password anytime. The member can use this to sign in.</p>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Email Address <span class="text-rose-500">*</span></label>
-            <input type="email" id="member-input-email" required placeholder="sarah.j@example.com" 
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Email Address <span class="text-slate-400 font-normal">(Optional)</span></label>
+            <input type="email" id="member-input-email" placeholder="sarah.j@example.com" 
                    class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
           </div>
           <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Phone Number <span class="text-rose-500">*</span></label>
-            <input type="tel" id="member-input-phone" required placeholder="+1 555-019-2831" 
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Phone Number <span class="text-slate-400 font-normal">(Optional)</span></label>
+            <input type="tel" id="member-input-phone" placeholder="+1 555-019-2831" 
                    class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
           </div>
         </div>
@@ -939,7 +929,7 @@
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Residential Address</label>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Residential Address <span class="text-slate-400 font-normal">(Optional)</span></label>
           <input type="text" id="member-input-address" placeholder="742 Evergreen Terrace, Springfield" 
                  class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
         </div>
@@ -1044,12 +1034,10 @@
 
             <!-- Actions Bar: Borrow for Member or Edit/Delete for Admin -->
             <div class="pt-3 border-t border-slate-100 flex items-center gap-2.5">
-              <!-- Member Borrow Button -->
               <button id="detail-btn-member-borrow" class="hidden px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition shadow-xs flex items-center gap-1.5">
                 <i class="fa-solid fa-arrow-right-arrow-left"></i> Borrow This Volume
               </button>
 
-              <!-- Admin Controls -->
               <button id="detail-btn-edit" class="admin-only px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-xl transition">
                 <i class="fa-solid fa-pen-to-square mr-1"></i> Edit Book & Cover
               </button>

@@ -1,9 +1,9 @@
 /**
  * Alexandria Library Management System - Core Application Logic
  * Comprehensive Authentication (Admin & Member roles),
- * Book CRUD with Cover Image Upload/Removal,
- * Member Management with Login Credentials View/Edit by Admin,
- * Circulation / Borrow & Return, and Persistence.
+ * Member Credentials Management (Admin View, Edit, & Reset),
+ * Member Self-Registration with Robust Persistence,
+ * Book Management with Image Upload/Removal, and Circulation.
  */
 
 // ==========================================
@@ -11,11 +11,11 @@
 // ==========================================
 
 const STORAGE_KEY_BOOKS = 'alexandria_books_v1';
-const STORAGE_KEY_MEMBERS = 'alexandria_members_v1';
+const STORAGE_KEY_MEMBERS = 'alexandria_members_v2'; // Bumped key to ensure clean schema migration
 const STORAGE_KEY_LOANS = 'alexandria_loans_v1';
 const STORAGE_KEY_LOGS = 'alexandria_logs_v1';
 const STORAGE_KEY_PROFILE = 'alexandria_profile_v1';
-const STORAGE_KEY_USER = 'alexandria_current_user_v1';
+const STORAGE_KEY_USER = 'alexandria_current_user_v2';
 
 const ADMIN_CREDENTIALS = {
   username: "admin",
@@ -104,7 +104,7 @@ const DEFAULT_BOOKS = [
     location: "Shelf PHIL-01",
     publisher: "Penguin Classics",
     description: "Plato's seminal dialogue examining justice, the nature of the philosopher king, the ideal society, and the allegory of the cave.",
-    coverImage: "" // Showcases procedural fallback cover
+    coverImage: ""
   },
   {
     id: "BK-1006",
@@ -122,7 +122,7 @@ const DEFAULT_BOOKS = [
   }
 ];
 
-// Members with login credentials (admin can view & manage)
+// Default members with guaranteed usernames and passwords
 const DEFAULT_MEMBERS = [
   {
     id: "MEM-1001",
@@ -216,7 +216,7 @@ const DEFAULT_LOANS = [
 const DEFAULT_LOGS = [
   { text: "System initialized with Alexandria v2.5 Auth & Catalog", time: "Just now", type: "system" },
   { text: "Dr. Marcus Chen checked out 'Clean Code'", time: "Oct 18, 2026", type: "loan" },
-  { text: "Sophia Rodriguez upgraded membership to Premium Tier", time: "Oct 15, 2026", type: "member" },
+  { text: "Sophia Rodriguez renewed membership to Premium Tier", time: "Oct 15, 2026", type: "member" },
   { text: "New volume 'Design Patterns' accessioned to Shelf CS-05", time: "Oct 10, 2026", type: "book" }
 ];
 
@@ -230,6 +230,7 @@ let currentUser = null; // { role: 'admin'|'member', username, name, id?, tier? 
 
 // Tracking revealed passwords in admin table
 let revealedPasswords = new Set();
+let allPasswordsRevealed = false;
 
 // View and filter states
 let currentView = 'dashboard';
@@ -238,45 +239,86 @@ let activeDeleteTarget = null;
 let currentModalCoverImage = null;
 
 // ==========================================
-// 2. INITIALIZATION & AUTH CHECKS
+// 2. DATA SANITIZATION & MIGRATION
 // ==========================================
 
-function initSystem() {
-  loadData();
-  setupEventListeners();
-  populateCategoryFilter();
-
-  // Check saved session
-  const storedUser = localStorage.getItem(STORAGE_KEY_USER);
-  if (storedUser) {
-    try {
-      currentUser = JSON.parse(storedUser);
-      // Validate that if member, member still exists
-      if (currentUser.role === 'member') {
-        const memberRecord = members.find(m => m.id === currentUser.id || m.username.toLowerCase() === currentUser.username.toLowerCase());
-        if (memberRecord) {
-          currentUser = { ...memberRecord, role: 'member' };
-        } else {
-          currentUser = null;
-        }
-      }
-    } catch (e) {
-      currentUser = null;
-    }
+/**
+ * Ensures every member record ALWAYS has valid, non-empty username and password strings.
+ * Seamlessly upgrades any legacy localStorage data.
+ */
+function sanitizeMembersList(rawList) {
+  if (!Array.isArray(rawList) || rawList.length === 0) {
+    return JSON.parse(JSON.stringify(DEFAULT_MEMBERS));
   }
 
-  applyAuthState();
+  const defaultCredsMap = {
+    "MEM-1001": { username: "marcus", password: "123" },
+    "MEM-1002": { username: "sophia", password: "123" },
+    "MEM-1003": { username: "alex", password: "123" },
+    "MEM-1004": { username: "clara", password: "123" }
+  };
+
+  return rawList.map((m, idx) => {
+    let username = (m.username || '').toString().trim();
+    let password = (m.password || '').toString().trim();
+
+    // If username is missing, assign from map or generate from name
+    if (!username) {
+      if (defaultCredsMap[m.id]) {
+        username = defaultCredsMap[m.id].username;
+      } else if (m.name) {
+        const cleanName = m.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+        username = cleanName.slice(0, 8) || `member${idx + 1}`;
+      } else {
+        username = `member${idx + 1}`;
+      }
+    }
+
+    // If password is missing, set to 123
+    if (!password) {
+      if (defaultCredsMap[m.id]) {
+        password = defaultCredsMap[m.id].password;
+      } else {
+        password = "123";
+      }
+    }
+
+    return {
+      id: m.id || `MEM-${1000 + idx + 1}`,
+      name: m.name || `Member ${idx + 1}`,
+      username: username,
+      password: password,
+      email: m.email || `${username}@library.org`,
+      phone: m.phone || '+1 555-0100',
+      tier: m.tier || 'Standard',
+      status: m.status || 'Active',
+      address: m.address || 'Patron Address',
+      joinDate: m.joinDate || '2024-01-01'
+    };
+  });
 }
 
 function loadData() {
   const storedBooks = localStorage.getItem(STORAGE_KEY_BOOKS);
-  const storedMembers = localStorage.getItem(STORAGE_KEY_MEMBERS);
+  // Check v2 key first, then fallback to v1 for backwards compatibility
+  const storedMembers = localStorage.getItem(STORAGE_KEY_MEMBERS) || localStorage.getItem('alexandria_members_v1');
   const storedLoans = localStorage.getItem(STORAGE_KEY_LOANS);
   const storedLogs = localStorage.getItem(STORAGE_KEY_LOGS);
   const storedProfile = localStorage.getItem(STORAGE_KEY_PROFILE);
 
   books = storedBooks ? JSON.parse(storedBooks) : [...DEFAULT_BOOKS];
-  members = storedMembers ? JSON.parse(storedMembers) : [...DEFAULT_MEMBERS];
+
+  // Parse and strictly sanitize members list
+  let rawMembers = null;
+  if (storedMembers) {
+    try {
+      rawMembers = JSON.parse(storedMembers);
+    } catch (e) {
+      rawMembers = null;
+    }
+  }
+  members = sanitizeMembersList(rawMembers);
+
   loans = storedLoans ? JSON.parse(storedLoans) : [...DEFAULT_LOANS];
   logs = storedLogs ? JSON.parse(storedLogs) : [...DEFAULT_LOGS];
   libraryProfile = storedProfile ? JSON.parse(storedProfile) : { ...DEFAULT_PROFILE };
@@ -290,6 +332,7 @@ function saveData() {
   localStorage.setItem(STORAGE_KEY_LOANS, JSON.stringify(loans));
   localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(logs));
   localStorage.setItem(STORAGE_KEY_PROFILE, JSON.stringify(libraryProfile));
+  
   if (currentUser) {
     localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(currentUser));
   } else {
@@ -310,8 +353,38 @@ function logActivity(text, type = 'info') {
 }
 
 // ==========================================
-// 3. AUTHENTICATION & ROLE MANAGEMENT
+// 3. AUTHENTICATION & LOGIN LOGIC
 // ==========================================
+
+function initSystem() {
+  loadData();
+  setupEventListeners();
+  populateCategoryFilter();
+
+  // Restore active user session if valid
+  const storedUser = localStorage.getItem(STORAGE_KEY_USER);
+  if (storedUser) {
+    try {
+      const parsed = JSON.parse(storedUser);
+      if (parsed.role === 'admin') {
+        currentUser = parsed;
+      } else if (parsed.role === 'member') {
+        const matchingMember = members.find(m => 
+          m.id === parsed.id || m.username.toLowerCase() === (parsed.username || '').toLowerCase()
+        );
+        if (matchingMember) {
+          currentUser = { ...matchingMember, role: 'member' };
+        } else {
+          currentUser = null;
+        }
+      }
+    } catch (e) {
+      currentUser = null;
+    }
+  }
+
+  applyAuthState();
+}
 
 function switchAuthTab(tab) {
   const loginTab = document.getElementById('tab-btn-login');
@@ -351,10 +424,15 @@ function toggleInputPassword(inputId, btn) {
 
 function handleLogin(event) {
   event.preventDefault();
-  const username = document.getElementById('login-username').value.trim();
-  const password = document.getElementById('login-password').value.trim();
+  const username = (document.getElementById('login-username').value || '').trim();
+  const password = (document.getElementById('login-password').value || '').trim();
 
-  // Check 1: Admin Login (admin / 123)
+  if (!username || !password) {
+    showToast('Please enter both username and password.', 'error');
+    return;
+  }
+
+  // 1. Check Admin Login (admin / 123)
   if (username.toLowerCase() === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
     currentUser = {
       role: 'admin',
@@ -369,9 +447,10 @@ function handleLogin(event) {
     return;
   }
 
-  // Check 2: Member Login (checks registered members by username & password)
+  // 2. Check Member Login (case-insensitive username match, exact password match)
   const member = members.find(m => 
-    m.username && m.username.toLowerCase() === username.toLowerCase() && m.password === password
+    (m.username || '').toLowerCase() === username.toLowerCase() && 
+    (m.password || '') === password
   );
 
   if (member) {
@@ -387,65 +466,71 @@ function handleLogin(event) {
     saveData();
     applyAuthState();
     showToast(`Welcome back, ${member.name}!`, 'success');
-    logActivity(`Member '${member.name}' (${member.username}) logged in`, 'member');
+    logActivity(`Member '${member.name}' (${member.username}) signed in`, 'member');
     return;
   }
 
-  showToast('Invalid username or password. Please try again.', 'error');
+  showToast('Invalid username or password. Check credentials and try again.', 'error');
 }
 
+// Self-Registration for New Members
 function handleRegister(event) {
   event.preventDefault();
-  const name = document.getElementById('reg-name').value.trim();
-  const username = document.getElementById('reg-username').value.trim();
-  const password = document.getElementById('reg-password').value.trim();
-  const email = document.getElementById('reg-email').value.trim();
-  const phone = document.getElementById('reg-phone').value.trim();
-  const tier = document.getElementById('reg-tier').value;
 
-  if (!name || !username || !password || !email || !phone) {
-    showToast('Please complete all registration fields.', 'error');
+  const name = (document.getElementById('reg-name').value || '').trim();
+  const username = (document.getElementById('reg-username').value || '').trim();
+  const password = (document.getElementById('reg-password').value || '').trim();
+  const email = (document.getElementById('reg-email')?.value || '').trim();
+  const phone = (document.getElementById('reg-phone')?.value || '').trim();
+  const tier = document.getElementById('reg-tier')?.value || 'Standard';
+
+  if (!name || !username || !password) {
+    showToast('Please provide Name, Username, and Password.', 'error');
     return;
   }
 
-  // Check uniqueness of username
-  if (username.toLowerCase() === 'admin' || members.some(m => m.username && m.username.toLowerCase() === username.toLowerCase())) {
-    showToast(`Username '${username}' is already taken. Please choose another.`, 'error');
+  // Check username uniqueness
+  const cleanUsername = username.toLowerCase();
+  if (cleanUsername === 'admin' || members.some(m => (m.username || '').toLowerCase() === cleanUsername)) {
+    showToast(`Username '${username}' is already taken. Please choose another username.`, 'error');
     return;
   }
 
   const newId = `MEM-${1000 + members.length + 1}`;
   const newMember = {
     id: newId,
-    name,
-    username,
-    password,
-    email,
-    phone,
-    tier,
+    name: name,
+    username: username,
+    password: password,
+    email: email || `${username}@library.org`,
+    phone: phone || '+1 555-0199',
+    tier: tier,
     status: 'Active',
     address: 'Registered Online',
     joinDate: new Date().toISOString().split('T')[0]
   };
 
+  // Add to members list and persist immediately
   members.push(newMember);
   currentUser = { ...newMember, role: 'member' };
   
   saveData();
-  logActivity(`New member registered account: ${name} (${username})`, 'member');
+  logActivity(`New member registered account: ${name} (User: ${username})`, 'member');
+
+  // Reset form
+  document.getElementById('form-register').reset();
+
   applyAuthState();
   showToast(`Account created successfully! Welcome to Alexandria, ${name}!`, 'success');
 }
 
 function handleLogout() {
-  const wasAdmin = currentUser && currentUser.role === 'admin';
   currentUser = null;
   saveData();
   applyAuthState();
   showToast('You have signed out successfully.', 'info');
 }
 
-// Update UI layout based on logged-in state and role
 function applyAuthState() {
   const authScreen = document.getElementById('auth-screen');
   const mainApp = document.getElementById('main-app');
@@ -461,10 +546,9 @@ function applyAuthState() {
   authScreen.classList.add('hidden');
   mainApp.classList.remove('hidden');
 
-  // Role Configuration
   const isAdmin = currentUser.role === 'admin';
 
-  // Toggle admin-only elements
+  // Toggle admin-only controls
   document.querySelectorAll('.admin-only').forEach(el => {
     if (isAdmin) {
       el.classList.remove('hidden');
@@ -473,7 +557,7 @@ function applyAuthState() {
     }
   });
 
-  // User badge and sidebar display
+  // User badge and sidebar
   const userRoleEl = document.getElementById('sidebar-user-role');
   const userNameEl = document.getElementById('sidebar-user-name');
   const userAvatarEl = document.getElementById('sidebar-user-avatar');
@@ -487,7 +571,6 @@ function applyAuthState() {
     topBadgeEl.innerHTML = `<i class="fa-solid fa-user-shield text-amber-500 mr-1"></i> Admin (${currentUser.username})`;
     topBadgeEl.className = "px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-900 border border-amber-200";
 
-    // Navigation Labels
     document.getElementById('nav-circulation-label').innerText = "Circulation / Loans";
     document.getElementById('dash-role-badge').innerHTML = `<i class="fa-solid fa-user-shield"></i> Administrator Dashboard`;
     document.getElementById('dash-greeting').innerText = `Welcome to The Alexandria Athenaeum`;
@@ -500,22 +583,19 @@ function applyAuthState() {
     topBadgeEl.innerHTML = `<i class="fa-solid fa-id-card text-emerald-500 mr-1"></i> Member: ${currentUser.name} (${currentUser.tier})`;
     topBadgeEl.className = "px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-900 border border-emerald-200";
 
-    // Relabel Circulation for member
     document.getElementById('nav-circulation-label').innerText = "My Borrowed Books";
     document.getElementById('dash-role-badge').innerHTML = `<i class="fa-solid fa-graduation-cap"></i> Member Scholar Portal`;
     document.getElementById('dash-greeting').innerText = `Welcome back, ${currentUser.name.split(' ')[0]}!`;
   }
 
-  // Switch to default view
   switchView('dashboard');
 }
 
 // ==========================================
-// 4. NAVIGATION & VIEW SWITCHING
+// 4. NAVIGATION & VIEWS
 // ==========================================
 
 function switchView(viewName) {
-  // Guard admin views
   if (currentUser && currentUser.role !== 'admin' && (viewName === 'members' || viewName === 'library-info')) {
     viewName = 'dashboard';
   }
@@ -544,7 +624,6 @@ function switchView(viewName) {
     }
   });
 
-  // Title mappings
   const isAdmin = currentUser && currentUser.role === 'admin';
   const titleMap = {
     'dashboard': { 
@@ -574,7 +653,6 @@ function switchView(viewName) {
     document.getElementById('page-subtitle').innerText = titleMap[viewName].subtitle;
   }
 
-  // Refresh view
   if (viewName === 'dashboard') renderDashboard();
   if (viewName === 'books') renderBooks();
   if (viewName === 'members') renderMembers();
@@ -621,7 +699,7 @@ function updateBadges() {
 }
 
 // ==========================================
-// 5. VIEW RENDERING
+// 5. DASHBOARD VIEW
 // ==========================================
 
 function renderDashboard() {
@@ -653,7 +731,6 @@ function renderDashboard() {
     kpi3Desc.innerText = "Active borrower loans";
     document.getElementById('dash-loans-heading').innerText = "Active Library Loans";
   } else {
-    // Member Dashboard statistics
     const myActiveLoans = loans.filter(l => l.memberId === currentUser.id && !l.returnDate);
     const tierLimits = { 'Student': 3, 'Standard': 5, 'Premium': 10, 'Faculty': 15 };
     const myLimit = tierLimits[currentUser.tier] || 5;
@@ -727,7 +804,7 @@ function renderDashboard() {
     });
   }
 
-  // Audit Log (Recent activity)
+  // Activity Log
   const logContainer = document.getElementById('dash-activity-log');
   logContainer.innerHTML = '';
   logs.slice(0, 5).forEach(log => {
@@ -772,7 +849,10 @@ function generateProceduralCoverHtml(book) {
   `;
 }
 
-// --- Books View ---
+// ==========================================
+// 6. BOOKS CATALOG (WITH COVER IMAGE CONTROLS)
+// ==========================================
+
 function renderBooks() {
   const search = (document.getElementById('book-search-input')?.value || '').toLowerCase().trim();
   const categoryFilter = document.getElementById('book-category-filter')?.value || 'ALL';
@@ -828,7 +908,6 @@ function renderBooks() {
         ? `<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold badge-available"><i class="fa-solid fa-circle-check mr-1 text-[10px]"></i> ${book.available}/${book.copies} Available</span>`
         : `<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold badge-out-of-stock"><i class="fa-solid fa-circle-xmark mr-1 text-[10px]"></i> Out of Stock</span>`;
 
-      // Bottom action bar based on role
       let actionBarHtml = '';
       if (isAdmin) {
         actionBarHtml = `
@@ -847,7 +926,6 @@ function renderBooks() {
           </div>
         `;
       } else {
-        // Member view
         actionBarHtml = `
           <div class="px-4 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
             <button onclick="viewBookDetails('${book.id}')" class="text-xs font-semibold text-slate-700 hover:text-indigo-600 flex items-center gap-1">
@@ -992,225 +1070,12 @@ function populateCategoryFilter() {
   });
 }
 
-// --- Members View (Admin Can View and Manage Member Logins) ---
-function renderMembers() {
-  const search = (document.getElementById('member-search-input')?.value || '').toLowerCase().trim();
-  const tierFilter = document.getElementById('member-tier-filter')?.value || 'ALL';
-
-  const filtered = members.filter(member => {
-    const matchesSearch = 
-      member.name.toLowerCase().includes(search) ||
-      member.email.toLowerCase().includes(search) ||
-      member.id.toLowerCase().includes(search) ||
-      (member.username && member.username.toLowerCase().includes(search));
-
-    const matchesTier = tierFilter === 'ALL' || member.tier === tierFilter;
-    return matchesSearch && matchesTier;
-  });
-
-  const tableBody = document.getElementById('members-table-body');
-  const emptyState = document.getElementById('members-empty-state');
-
-  if (filtered.length === 0) {
-    tableBody.parentElement.parentElement.classList.add('hidden');
-    emptyState.classList.remove('hidden');
-    return;
-  }
-
-  emptyState.classList.add('hidden');
-  tableBody.parentElement.parentElement.classList.remove('hidden');
-  tableBody.innerHTML = '';
-
-  filtered.forEach(member => {
-    const activeBorrowedCount = loans.filter(l => l.memberId === member.id && !l.returnDate).length;
-    const tr = document.createElement('tr');
-    tr.className = "hover:bg-slate-50/80 transition";
-
-    const initials = member.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-    const isPasswordRevealed = revealedPasswords.has(member.id);
-
-    const tierBadges = {
-      'Faculty': 'bg-purple-50 text-purple-700 border-purple-200',
-      'Premium': 'bg-amber-50 text-amber-700 border-amber-200',
-      'Student': 'bg-blue-50 text-blue-700 border-blue-200',
-      'Standard': 'bg-slate-100 text-slate-700 border-slate-200'
-    };
-
-    const tierBadgeClass = tierBadges[member.tier] || 'bg-slate-100 text-slate-700';
-
-    tr.innerHTML = `
-      <td class="py-3.5 px-4 flex items-center gap-3">
-        <div class="w-10 h-10 rounded-full bg-slate-900 text-amber-400 font-bold flex items-center justify-center text-xs shadow-xs">
-          ${initials}
-        </div>
-        <div>
-          <p class="font-bold text-slate-900">${escapeHtml(member.name)}</p>
-          <p class="text-xs text-slate-500">Joined ${escapeHtml(member.joinDate || '2024')}</p>
-        </div>
-      </td>
-      <td class="py-3.5 px-4 font-mono text-xs font-semibold text-slate-700">${escapeHtml(member.id)}</td>
-      
-      <!-- Admin View & Manage Member Credentials -->
-      <td class="py-3.5 px-4 bg-amber-50/40 border-x border-amber-200/50">
-        <div class="space-y-1">
-          <div class="flex items-center gap-1.5 text-xs">
-            <span class="text-slate-400">User:</span>
-            <code class="font-bold text-indigo-900 bg-white px-1.5 py-0.5 rounded border border-slate-200">${escapeHtml(member.username || 'unassigned')}</code>
-          </div>
-          <div class="flex items-center gap-1.5 text-xs">
-            <span class="text-slate-400">Pass:</span>
-            <span class="font-mono text-slate-800 bg-white px-1.5 py-0.5 rounded border border-slate-200">
-              ${isPasswordRevealed ? escapeHtml(member.password) : '••••••'}
-            </span>
-            <button onclick="togglePasswordReveal('${member.id}')" title="${isPasswordRevealed ? 'Hide Password' : 'Show Password'}" class="text-amber-700 hover:text-amber-900 p-1">
-              <i class="fa-regular ${isPasswordRevealed ? 'fa-eye-slash' : 'fa-eye'} text-xs"></i>
-            </button>
-            <button onclick="openEditMemberModal('${member.id}')" title="Change/Manage Password" class="text-indigo-600 hover:text-indigo-800 text-[10px] underline ml-1">
-              Edit
-            </button>
-          </div>
-        </div>
-      </td>
-
-      <td class="py-3.5 px-4">
-        <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full border ${tierBadgeClass}">
-          ${escapeHtml(member.tier)}
-        </span>
-      </td>
-      <td class="py-3.5 px-4 text-xs">
-        <p class="text-slate-800 font-medium">${escapeHtml(member.email)}</p>
-        <p class="text-slate-500">${escapeHtml(member.phone)}</p>
-      </td>
-      <td class="py-3.5 px-4">
-        <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full ${member.status === 'Active' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}">
-          ${escapeHtml(member.status)}
-        </span>
-      </td>
-      <td class="py-3.5 px-4">
-        <span class="text-xs font-bold px-2 py-0.5 rounded-md ${activeBorrowedCount > 0 ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'}">
-          ${activeBorrowedCount} books
-        </span>
-      </td>
-      <td class="py-3.5 px-4 text-right space-x-1">
-        <button onclick="openEditMemberModal('${member.id}')" title="Edit Profile & Password" class="px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-emerald-700 hover:bg-slate-100 rounded-lg transition">
-          <i class="fa-solid fa-user-pen"></i>
-        </button>
-        <button onclick="confirmDeleteMember('${member.id}')" title="Remove Member" class="px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-lg transition">
-          <i class="fa-solid fa-trash-can"></i>
-        </button>
-      </td>
-    `;
-    tableBody.appendChild(tr);
-  });
-}
-
-function filterMembers() {
-  renderMembers();
-}
-
-function togglePasswordReveal(memberId) {
-  if (revealedPasswords.has(memberId)) {
-    revealedPasswords.delete(memberId);
-  } else {
-    revealedPasswords.add(memberId);
-  }
-  renderMembers();
-}
-
-// --- Circulation View ---
-function renderCirculation() {
-  const tableBody = document.getElementById('loans-table-body');
-  const emptyState = document.getElementById('loans-empty-state');
-  const isAdmin = currentUser && currentUser.role === 'admin';
-
-  const relevantLoans = isAdmin
-    ? loans
-    : loans.filter(l => l.memberId === currentUser.id);
-
-  if (relevantLoans.length === 0) {
-    tableBody.parentElement.parentElement.classList.add('hidden');
-    emptyState.classList.remove('hidden');
-    document.getElementById('loans-empty-title').innerText = isAdmin 
-      ? "No outstanding book loans" 
-      : "You have no active book loans";
-    return;
-  }
-
-  emptyState.classList.add('hidden');
-  tableBody.parentElement.parentElement.classList.remove('hidden');
-  tableBody.innerHTML = '';
-
-  relevantLoans.forEach(loan => {
-    const book = books.find(b => b.id === loan.bookId) || { title: 'Unknown Book', isbn: 'N/A' };
-    const member = members.find(m => m.id === loan.memberId) || { name: 'Unknown Patron', email: 'N/A' };
-
-    const tr = document.createElement('tr');
-    tr.className = "hover:bg-slate-50/80 transition";
-
-    const isReturned = !!loan.returnDate;
-    const isOverdue = !isReturned && new Date(loan.dueDate) < new Date();
-
-    let statusHtml = '';
-    if (isReturned) {
-      statusHtml = `<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600"><i class="fa-solid fa-check mr-1"></i> Returned</span>`;
-    } else if (isOverdue) {
-      statusHtml = `<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-700"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Overdue</span>`;
-    } else {
-      statusHtml = `<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700"><i class="fa-regular fa-clock mr-1"></i> In Circulation</span>`;
-    }
-
-    tr.innerHTML = `
-      <td class="py-3.5 px-4 font-mono text-xs font-semibold text-slate-700">${loan.id}</td>
-      <td class="py-3.5 px-4">
-        <p class="font-bold text-slate-900">${escapeHtml(book.title)}</p>
-        <p class="text-xs text-slate-400">ID: ${loan.bookId}</p>
-      </td>
-      <td class="py-3.5 px-4">
-        <p class="font-semibold text-slate-800">${escapeHtml(member.name)}</p>
-        <p class="text-xs text-slate-500">${escapeHtml(member.email)}</p>
-      </td>
-      <td class="py-3.5 px-4 text-xs text-slate-600">${loan.borrowDate}</td>
-      <td class="py-3.5 px-4 text-xs font-semibold ${isOverdue ? 'text-rose-600' : 'text-slate-700'}">${loan.dueDate}</td>
-      <td class="py-3.5 px-4">${statusHtml}</td>
-      <td class="py-3.5 px-4 text-right">
-        ${!isReturned ? `
-          <button onclick="handleReturnBook('${loan.id}')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-xs transition">
-            <i class="fa-solid fa-rotate-left mr-1"></i> Return Book
-          </button>
-        ` : `
-          <span class="text-xs text-slate-400 italic">Returned on ${loan.returnDate}</span>
-        `}
-      </td>
-    `;
-    tableBody.appendChild(tr);
-  });
-}
-
-// --- Library Profile View ---
-function renderLibraryProfile() {
-  document.getElementById('info-name').innerText = libraryProfile.name;
-  document.getElementById('info-librarian').innerText = libraryProfile.librarian;
-  document.getElementById('info-hours').innerText = libraryProfile.hours;
-  document.getElementById('info-address').innerText = libraryProfile.address;
-  document.getElementById('info-phone').innerText = libraryProfile.phone;
-  document.getElementById('info-email').innerText = libraryProfile.email;
-
-  document.getElementById('sidebar-lib-name').innerText = libraryProfile.name.split(' ')[0] + " Library";
-  document.getElementById('dash-lib-tagline').innerText = libraryProfile.tagline;
-  document.getElementById('dash-hours').innerText = libraryProfile.hours;
-  document.getElementById('dash-phone').innerText = libraryProfile.phone;
-}
-
-// ==========================================
-// 6. BOOK MANAGEMENT & IMAGE UPLOAD/REMOVE
-// ==========================================
-
 function handleBookImageFile(event) {
   const file = event.target.files[0];
   if (!file) return;
 
   if (!file.type.startsWith('image/')) {
-    showToast('Please select an image file (JPG, PNG, WebP).', 'error');
+    showToast('Please select a valid image file (JPG, PNG, WebP).', 'error');
     return;
   }
 
@@ -1259,7 +1124,6 @@ function setBookModalImage(imageSrc) {
   }
 }
 
-// Option to REMOVE Book Image (Required by user!)
 function removeBookImage() {
   currentModalCoverImage = null;
   document.getElementById('book-image-preview').src = '';
@@ -1292,7 +1156,6 @@ function handleSaveBook(event) {
   }
 
   if (id) {
-    // EDIT
     const index = books.findIndex(b => b.id === id);
     if (index !== -1) {
       const existing = books[index];
@@ -1318,7 +1181,6 @@ function handleSaveBook(event) {
       showToast(`Book '${title}' updated successfully!`, 'success');
     }
   } else {
-    // ADD
     const newId = `BK-${1000 + books.length + 1}`;
     const newBook = {
       id: newId,
@@ -1408,7 +1270,6 @@ function viewBookDetails(bookId) {
     document.getElementById('detail-btn-edit').onclick = () => openEditBookModal(book.id);
     document.getElementById('detail-btn-delete').onclick = () => confirmDeleteBook(book.id);
   } else {
-    // For Member
     if (book.available > 0) {
       memberBorrowBtn.classList.remove('hidden');
       memberBorrowBtn.onclick = () => {
@@ -1447,70 +1308,80 @@ function confirmDeleteBook(bookId) {
 }
 
 // ==========================================
-// 7. MEMBER CRUD & ADMIN CREDENTIALS MANAGEMENT
+// 7. MEMBERS MANAGEMENT & CREDENTIALS (ADMIN)
 // ==========================================
 
 function handleSaveMember(event) {
   event.preventDefault();
 
   const id = document.getElementById('member-form-id').value;
-  const name = document.getElementById('member-input-name').value.trim();
-  const username = document.getElementById('member-input-username').value.trim();
-  const password = document.getElementById('member-input-password').value.trim();
-  const email = document.getElementById('member-input-email').value.trim();
-  const phone = document.getElementById('member-input-phone').value.trim();
-  const tier = document.getElementById('member-input-tier').value;
-  const status = document.getElementById('member-input-status').value;
-  const address = document.getElementById('member-input-address').value.trim();
+  const name = (document.getElementById('member-input-name').value || '').trim();
+  const username = (document.getElementById('member-input-username').value || '').trim();
+  const password = (document.getElementById('member-input-password').value || '').trim();
+  const email = (document.getElementById('member-input-email').value || '').trim();
+  const phone = (document.getElementById('member-input-phone').value || '').trim();
+  const tier = document.getElementById('member-input-tier').value || 'Standard';
+  const status = document.getElementById('member-input-status').value || 'Active';
+  const address = (document.getElementById('member-input-address').value || '').trim();
 
-  if (!name || !username || !password || !email || !phone) {
-    showToast('Please fill in all required fields including login credentials.', 'error');
+  if (!name || !username || !password) {
+    showToast('Please provide Name, Login Username, and Password.', 'error');
     return;
   }
 
-  // Check username uniqueness
-  const duplicate = members.find(m => m.username.toLowerCase() === username.toLowerCase() && m.id !== id);
-  if (duplicate || username.toLowerCase() === 'admin') {
+  // Safe username uniqueness check
+  const cleanUsername = username.toLowerCase();
+  const duplicate = members.find(m => 
+    (m.username || '').toLowerCase() === cleanUsername && m.id !== id
+  );
+
+  if (duplicate || cleanUsername === 'admin') {
     showToast(`Username '${username}' is already in use. Please select a unique username.`, 'error');
     return;
   }
 
   if (id) {
-    // EDIT
+    // Edit existing member
     const index = members.findIndex(m => m.id === id);
     if (index !== -1) {
       members[index] = {
         ...members[index],
-        name,
-        username,
-        password,
-        email,
-        phone,
-        tier,
-        status,
-        address
+        name: name,
+        username: username,
+        password: password,
+        email: email || members[index].email || `${username}@library.org`,
+        phone: phone || members[index].phone || '+1 555-0100',
+        tier: tier,
+        status: status,
+        address: address || members[index].address || ''
       };
-      logActivity(`Admin updated member & login credentials for ${name} (${username})`, 'member');
-      showToast(`Member profile and login for ${name} updated successfully!`, 'success');
+
+      // If updating the active logged-in member
+      if (currentUser && currentUser.role === 'member' && currentUser.id === id) {
+        currentUser = { ...members[index], role: 'member' };
+      }
+
+      logActivity(`Admin updated login credentials for ${name} (User: ${username})`, 'member');
+      showToast(`Member profile and login for '${name}' saved successfully!`, 'success');
     }
   } else {
-    // ADD
+    // Add new member
     const newId = `MEM-${1000 + members.length + 1}`;
     const newMember = {
       id: newId,
-      name,
-      username,
-      password,
-      email,
-      phone,
-      tier,
-      status,
-      address,
+      name: name,
+      username: username,
+      password: password,
+      email: email || `${username}@library.org`,
+      phone: phone || '+1 555-0100',
+      tier: tier,
+      status: status,
+      address: address || 'Library Patron',
       joinDate: new Date().toISOString().split('T')[0]
     };
     members.push(newMember);
     logActivity(`Admin enrolled new member with login: ${name} (${username})`, 'member');
-    showToast(`New member ${name} created with username '${username}'!`, 'success');
+    showToast(`New member '${name}' created with login username '${username}'!`, 'success');
   }
 
   saveData();
@@ -1526,13 +1397,13 @@ function openEditMemberModal(memberId) {
 
   document.getElementById('modal-member-title').innerText = "Edit Member & Login Credentials";
   document.getElementById('member-form-id').value = member.id;
-  document.getElementById('member-input-name').value = member.name;
+  document.getElementById('member-input-name').value = member.name || '';
   document.getElementById('member-input-username').value = member.username || '';
   document.getElementById('member-input-password').value = member.password || '';
-  document.getElementById('member-input-email').value = member.email;
-  document.getElementById('member-input-phone').value = member.phone;
-  document.getElementById('member-input-tier').value = member.tier;
-  document.getElementById('member-input-status').value = member.status;
+  document.getElementById('member-input-email').value = member.email || '';
+  document.getElementById('member-input-phone').value = member.phone || '';
+  document.getElementById('member-input-tier').value = member.tier || 'Standard';
+  document.getElementById('member-input-status').value = member.status || 'Active';
   document.getElementById('member-input-address').value = member.address || '';
 
   openModal('modal-add-member');
@@ -1560,8 +1431,141 @@ function confirmDeleteMember(memberId) {
   openModal('modal-confirm-delete');
 }
 
+function renderMembers() {
+  const search = (document.getElementById('member-search-input')?.value || '').toLowerCase().trim();
+  const tierFilter = document.getElementById('member-tier-filter')?.value || 'ALL';
+
+  const filtered = members.filter(member => {
+    const matchesSearch = 
+      (member.name || '').toLowerCase().includes(search) ||
+      (member.email || '').toLowerCase().includes(search) ||
+      (member.id || '').toLowerCase().includes(search) ||
+      (member.username || '').toLowerCase().includes(search);
+
+    const matchesTier = tierFilter === 'ALL' || member.tier === tierFilter;
+    return matchesSearch && matchesTier;
+  });
+
+  const tableBody = document.getElementById('members-table-body');
+  const emptyState = document.getElementById('members-empty-state');
+
+  if (filtered.length === 0) {
+    tableBody.parentElement.parentElement.classList.add('hidden');
+    emptyState.classList.remove('hidden');
+    return;
+  }
+
+  emptyState.classList.add('hidden');
+  tableBody.parentElement.parentElement.classList.remove('hidden');
+  tableBody.innerHTML = '';
+
+  filtered.forEach(member => {
+    const activeBorrowedCount = loans.filter(l => l.memberId === member.id && !l.returnDate).length;
+    const tr = document.createElement('tr');
+    tr.className = "hover:bg-slate-50/80 transition";
+
+    const initials = (member.name || 'Member').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+    const isPasswordRevealed = allPasswordsRevealed || revealedPasswords.has(member.id);
+
+    const tierBadges = {
+      'Faculty': 'bg-purple-50 text-purple-700 border-purple-200',
+      'Premium': 'bg-amber-50 text-amber-700 border-amber-200',
+      'Student': 'bg-blue-50 text-blue-700 border-blue-200',
+      'Standard': 'bg-slate-100 text-slate-700 border-slate-200'
+    };
+
+    const tierBadgeClass = tierBadges[member.tier] || 'bg-slate-100 text-slate-700';
+
+    tr.innerHTML = `
+      <td class="py-3.5 px-4 flex items-center gap-3">
+        <div class="w-10 h-10 rounded-full bg-slate-900 text-amber-400 font-bold flex items-center justify-center text-xs shadow-xs">
+          ${initials}
+        </div>
+        <div>
+          <p class="font-bold text-slate-900">${escapeHtml(member.name)}</p>
+          <p class="text-xs text-slate-500">Joined ${escapeHtml(member.joinDate || '2024')}</p>
+        </div>
+      </td>
+      <td class="py-3.5 px-4 font-mono text-xs font-semibold text-slate-700">${escapeHtml(member.id)}</td>
+      
+      <!-- Admin View & Manage Member Credentials -->
+      <td class="py-3.5 px-4 bg-amber-50/40 border-x border-amber-200/50">
+        <div class="space-y-1">
+          <div class="flex items-center gap-1.5 text-xs">
+            <span class="text-slate-400 font-medium">User:</span>
+            <code class="font-bold text-indigo-900 bg-white px-2 py-0.5 rounded border border-slate-200 text-xs">${escapeHtml(member.username || 'unassigned')}</code>
+          </div>
+          <div class="flex items-center gap-1.5 text-xs">
+            <span class="text-slate-400 font-medium">Pass:</span>
+            <span class="font-mono text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200 text-xs font-semibold">
+              ${isPasswordRevealed ? escapeHtml(member.password) : '••••••'}
+            </span>
+            <button type="button" onclick="togglePasswordReveal('${member.id}')" title="${isPasswordRevealed ? 'Hide Password' : 'Show Password'}" class="text-amber-700 hover:text-amber-900 p-1">
+              <i class="fa-regular ${isPasswordRevealed ? 'fa-eye-slash' : 'fa-eye'} text-xs"></i>
+            </button>
+            <button type="button" onclick="openEditMemberModal('${member.id}')" title="Change/Manage Password" class="text-indigo-600 hover:text-indigo-800 text-[10px] font-bold underline ml-1">
+              Edit
+            </button>
+          </div>
+        </div>
+      </td>
+
+      <td class="py-3.5 px-4">
+        <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full border ${tierBadgeClass}">
+          ${escapeHtml(member.tier)}
+        </span>
+      </td>
+      <td class="py-3.5 px-4 text-xs">
+        <p class="text-slate-800 font-medium">${escapeHtml(member.email)}</p>
+        <p class="text-slate-500">${escapeHtml(member.phone)}</p>
+      </td>
+      <td class="py-3.5 px-4">
+        <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full ${member.status === 'Active' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}">
+          ${escapeHtml(member.status)}
+        </span>
+      </td>
+      <td class="py-3.5 px-4">
+        <span class="text-xs font-bold px-2 py-0.5 rounded-md ${activeBorrowedCount > 0 ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'}">
+          ${activeBorrowedCount} books
+        </span>
+      </td>
+      <td class="py-3.5 px-4 text-right space-x-1">
+        <button onclick="openEditMemberModal('${member.id}')" title="Edit Profile & Password" class="px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-emerald-700 hover:bg-slate-100 rounded-lg transition">
+          <i class="fa-solid fa-user-pen"></i>
+        </button>
+        <button onclick="confirmDeleteMember('${member.id}')" title="Remove Member" class="px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-lg transition">
+          <i class="fa-solid fa-trash-can"></i>
+        </button>
+      </td>
+    `;
+    tableBody.appendChild(tr);
+  });
+}
+
+function filterMembers() {
+  renderMembers();
+}
+
+function togglePasswordReveal(memberId) {
+  if (revealedPasswords.has(memberId)) {
+    revealedPasswords.delete(memberId);
+  } else {
+    revealedPasswords.add(memberId);
+  }
+  renderMembers();
+}
+
+function toggleAllPasswordsReveal() {
+  allPasswordsRevealed = !allPasswordsRevealed;
+  const btnText = document.getElementById('btn-reveal-all-text');
+  if (btnText) {
+    btnText.innerText = allPasswordsRevealed ? "Hide All" : "Show All";
+  }
+  renderMembers();
+}
+
 // ==========================================
-// 8. CIRCULATION & BORROWING (ADMIN & MEMBER)
+// 8. CIRCULATION & BORROWING
 // ==========================================
 
 function openIssueBookModal() {
@@ -1589,7 +1593,7 @@ function openIssueBookModal() {
     activeMembers.forEach(m => {
       const opt = document.createElement('option');
       opt.value = m.id;
-      opt.innerText = `${m.name} (${m.id}) - ${m.tier}`;
+      opt.innerText = `${m.name} (${m.id}) - User: ${m.username}`;
       memberSelect.appendChild(opt);
     });
   }
@@ -1625,7 +1629,6 @@ function handleIssueBook(event) {
     return;
   }
 
-  // Quota check
   const memberActiveLoans = loans.filter(l => l.memberId === memberId && !l.returnDate).length;
   const tierLimits = { 'Student': 3, 'Standard': 5, 'Premium': 10, 'Faculty': 15 };
   const maxAllowed = tierLimits[member.tier] || 5;
@@ -1659,7 +1662,6 @@ function handleIssueBook(event) {
   updateBadges();
 }
 
-// Quick borrow for logged in member
 function quickMemberBorrow(bookId) {
   if (!currentUser || currentUser.role !== 'member') {
     showToast('Please sign in as a member to borrow books.', 'error');
@@ -1732,8 +1734,76 @@ function handleReturnBook(loanId) {
   updateBadges();
 }
 
+function renderCirculation() {
+  const tableBody = document.getElementById('loans-table-body');
+  const emptyState = document.getElementById('loans-empty-state');
+  const isAdmin = currentUser && currentUser.role === 'admin';
+
+  const relevantLoans = isAdmin
+    ? loans
+    : loans.filter(l => l.memberId === currentUser.id);
+
+  if (relevantLoans.length === 0) {
+    tableBody.parentElement.parentElement.classList.add('hidden');
+    emptyState.classList.remove('hidden');
+    document.getElementById('loans-empty-title').innerText = isAdmin 
+      ? "No outstanding book loans" 
+      : "You have no active book loans";
+    return;
+  }
+
+  emptyState.classList.add('hidden');
+  tableBody.parentElement.parentElement.classList.remove('hidden');
+  tableBody.innerHTML = '';
+
+  relevantLoans.forEach(loan => {
+    const book = books.find(b => b.id === loan.bookId) || { title: 'Unknown Book', isbn: 'N/A' };
+    const member = members.find(m => m.id === loan.memberId) || { name: 'Unknown Patron', email: 'N/A' };
+
+    const tr = document.createElement('tr');
+    tr.className = "hover:bg-slate-50/80 transition";
+
+    const isReturned = !!loan.returnDate;
+    const isOverdue = !isReturned && new Date(loan.dueDate) < new Date();
+
+    let statusHtml = '';
+    if (isReturned) {
+      statusHtml = `<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600"><i class="fa-solid fa-check mr-1"></i> Returned</span>`;
+    } else if (isOverdue) {
+      statusHtml = `<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-100 text-rose-700"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Overdue</span>`;
+    } else {
+      statusHtml = `<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700"><i class="fa-regular fa-clock mr-1"></i> In Circulation</span>`;
+    }
+
+    tr.innerHTML = `
+      <td class="py-3.5 px-4 font-mono text-xs font-semibold text-slate-700">${loan.id}</td>
+      <td class="py-3.5 px-4">
+        <p class="font-bold text-slate-900">${escapeHtml(book.title)}</p>
+        <p class="text-xs text-slate-400">ID: ${loan.bookId}</p>
+      </td>
+      <td class="py-3.5 px-4">
+        <p class="font-semibold text-slate-800">${escapeHtml(member.name)}</p>
+        <p class="text-xs text-slate-500">${escapeHtml(member.email)}</p>
+      </td>
+      <td class="py-3.5 px-4 text-xs text-slate-600">${loan.borrowDate}</td>
+      <td class="py-3.5 px-4 text-xs font-semibold ${isOverdue ? 'text-rose-600' : 'text-slate-700'}">${loan.dueDate}</td>
+      <td class="py-3.5 px-4">${statusHtml}</td>
+      <td class="py-3.5 px-4 text-right">
+        ${!isReturned ? `
+          <button onclick="handleReturnBook('${loan.id}')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-xs transition">
+            <i class="fa-solid fa-rotate-left mr-1"></i> Return Book
+          </button>
+        ` : `
+          <span class="text-xs text-slate-400 italic">Returned on ${loan.returnDate}</span>
+        `}
+      </td>
+    `;
+    tableBody.appendChild(tr);
+  });
+}
+
 // ==========================================
-// 9. EXECUTE DELETION
+// 9. EXECUTE DELETION & PROFILE
 // ==========================================
 
 function executeDeletion() {
@@ -1761,9 +1831,19 @@ function executeDeletion() {
   updateBadges();
 }
 
-// ==========================================
-// 10. LIBRARY PROFILE EDIT & BACKUP
-// ==========================================
+function renderLibraryProfile() {
+  document.getElementById('info-name').innerText = libraryProfile.name;
+  document.getElementById('info-librarian').innerText = libraryProfile.librarian;
+  document.getElementById('info-hours').innerText = libraryProfile.hours;
+  document.getElementById('info-address').innerText = libraryProfile.address;
+  document.getElementById('info-phone').innerText = libraryProfile.phone;
+  document.getElementById('info-email').innerText = libraryProfile.email;
+
+  document.getElementById('sidebar-lib-name').innerText = libraryProfile.name.split(' ')[0] + " Library";
+  document.getElementById('dash-lib-tagline').innerText = libraryProfile.tagline;
+  document.getElementById('dash-hours').innerText = libraryProfile.hours;
+  document.getElementById('dash-phone').innerText = libraryProfile.phone;
+}
 
 function openEditLibraryModal() {
   document.getElementById('lib-edit-name').value = libraryProfile.name;
@@ -1826,7 +1906,7 @@ function importData(event) {
       const data = JSON.parse(e.target.result);
       if (data.books && Array.isArray(data.books)) {
         books = data.books;
-        if (data.members) members = data.members;
+        if (data.members) members = sanitizeMembersList(data.members);
         if (data.loans) loans = data.loans;
         if (data.profile) libraryProfile = data.profile;
         if (data.logs) logs = data.logs;
@@ -1871,7 +1951,7 @@ function resetToSampleData() {
 }
 
 // ==========================================
-// 11. MODAL & UTILITY FUNCTIONS
+// 10. MODAL & UTILITY FUNCTIONS
 // ==========================================
 
 function openModal(modalId) {
@@ -1989,5 +2069,4 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
-// Start application
 window.addEventListener('DOMContentLoaded', initSystem);
