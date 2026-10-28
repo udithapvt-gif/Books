@@ -1,11 +1,13 @@
 /**
  * Alexandria Library Management System - Core Application Logic
- * Comprehensive features: Books Catalog (Add, Edit, Remove, Image Upload/Removal),
- * Members Directory (Add, Edit, Remove), Circulation / Loans, Audit Log, and Institutional Profile.
+ * Comprehensive Authentication (Admin & Member roles),
+ * Book CRUD with Cover Image Upload/Removal,
+ * Member Management with Login Credentials View/Edit by Admin,
+ * Circulation / Borrow & Return, and Persistence.
  */
 
 // ==========================================
-// 1. INITIAL SEED DATA & STORAGE
+// 1. STORAGE KEYS & INITIAL SEED DATA
 // ==========================================
 
 const STORAGE_KEY_BOOKS = 'alexandria_books_v1';
@@ -13,6 +15,15 @@ const STORAGE_KEY_MEMBERS = 'alexandria_members_v1';
 const STORAGE_KEY_LOANS = 'alexandria_loans_v1';
 const STORAGE_KEY_LOGS = 'alexandria_logs_v1';
 const STORAGE_KEY_PROFILE = 'alexandria_profile_v1';
+const STORAGE_KEY_USER = 'alexandria_current_user_v1';
+
+const ADMIN_CREDENTIALS = {
+  username: "admin",
+  password: "123",
+  role: "admin",
+  name: "Dr. Eleanor Vance (Admin)",
+  email: "admin@alexandrialibrary.org"
+};
 
 const DEFAULT_PROFILE = {
   name: "Alexandria Athenaeum Central Library",
@@ -93,7 +104,7 @@ const DEFAULT_BOOKS = [
     location: "Shelf PHIL-01",
     publisher: "Penguin Classics",
     description: "Plato's seminal dialogue examining justice, the nature of the philosopher king, the ideal society, and the allegory of the cave.",
-    coverImage: "" // Intentionally empty to showcase elegant procedural fallback cover!
+    coverImage: "" // Showcases procedural fallback cover
   },
   {
     id: "BK-1006",
@@ -111,10 +122,13 @@ const DEFAULT_BOOKS = [
   }
 ];
 
+// Members with login credentials (admin can view & manage)
 const DEFAULT_MEMBERS = [
   {
     id: "MEM-1001",
     name: "Dr. Marcus Chen",
+    username: "marcus",
+    password: "123",
     email: "marcus.chen@university.edu",
     phone: "+1 (555) 349-8102",
     tier: "Faculty",
@@ -125,6 +139,8 @@ const DEFAULT_MEMBERS = [
   {
     id: "MEM-1002",
     name: "Sophia Rodriguez",
+    username: "sophia",
+    password: "123",
     email: "sophia.rodriguez@gmail.com",
     phone: "+1 (555) 782-9341",
     tier: "Premium",
@@ -135,6 +151,8 @@ const DEFAULT_MEMBERS = [
   {
     id: "MEM-1003",
     name: "Alexander Kim",
+    username: "alex",
+    password: "123",
     email: "a.kim@student.edu",
     phone: "+1 (555) 604-1189",
     tier: "Student",
@@ -145,6 +163,8 @@ const DEFAULT_MEMBERS = [
   {
     id: "MEM-1004",
     name: "Clara Hawthorne",
+    username: "clara",
+    password: "123",
     email: "clara.hawthorne@literary.org",
     phone: "+1 (555) 492-3084",
     tier: "Standard",
@@ -194,36 +214,58 @@ const DEFAULT_LOANS = [
 ];
 
 const DEFAULT_LOGS = [
-  { text: "System initialized with Alexandria digital catalog v2.5", time: "Just now", type: "system" },
-  { text: "Alexander Kim checked out 'Clean Code'", time: "Oct 18, 2026", type: "loan" },
-  { text: "Sophia Rodriguez renewed membership to Premium Tier", time: "Oct 15, 2026", type: "member" },
+  { text: "System initialized with Alexandria v2.5 Auth & Catalog", time: "Just now", type: "system" },
+  { text: "Dr. Marcus Chen checked out 'Clean Code'", time: "Oct 18, 2026", type: "loan" },
+  { text: "Sophia Rodriguez upgraded membership to Premium Tier", time: "Oct 15, 2026", type: "member" },
   { text: "New volume 'Design Patterns' accessioned to Shelf CS-05", time: "Oct 10, 2026", type: "book" }
 ];
 
-// State variables
+// App State
 let books = [];
 let members = [];
 let loans = [];
 let logs = [];
 let libraryProfile = {};
+let currentUser = null; // { role: 'admin'|'member', username, name, id?, tier? }
+
+// Tracking revealed passwords in admin table
+let revealedPasswords = new Set();
 
 // View and filter states
 let currentView = 'dashboard';
-let bookViewMode = 'grid'; // 'grid' or 'table'
-let activeDeleteTarget = null; // { type: 'book'|'member'|'loan', id: string, name: string }
-
-// Temporary holder for book cover in modal (supports upload / URL / removal)
+let bookViewMode = 'grid';
+let activeDeleteTarget = null;
 let currentModalCoverImage = null;
 
 // ==========================================
-// 2. INITIALIZATION & DATA PERSISTENCE
+// 2. INITIALIZATION & AUTH CHECKS
 // ==========================================
 
 function initSystem() {
   loadData();
-  renderAllViews();
   setupEventListeners();
   populateCategoryFilter();
+
+  // Check saved session
+  const storedUser = localStorage.getItem(STORAGE_KEY_USER);
+  if (storedUser) {
+    try {
+      currentUser = JSON.parse(storedUser);
+      // Validate that if member, member still exists
+      if (currentUser.role === 'member') {
+        const memberRecord = members.find(m => m.id === currentUser.id || m.username.toLowerCase() === currentUser.username.toLowerCase());
+        if (memberRecord) {
+          currentUser = { ...memberRecord, role: 'member' };
+        } else {
+          currentUser = null;
+        }
+      }
+    } catch (e) {
+      currentUser = null;
+    }
+  }
+
+  applyAuthState();
 }
 
 function loadData() {
@@ -248,6 +290,11 @@ function saveData() {
   localStorage.setItem(STORAGE_KEY_LOANS, JSON.stringify(loans));
   localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(logs));
   localStorage.setItem(STORAGE_KEY_PROFILE, JSON.stringify(libraryProfile));
+  if (currentUser) {
+    localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(currentUser));
+  } else {
+    localStorage.removeItem(STORAGE_KEY_USER);
+  }
 }
 
 function logActivity(text, type = 'info') {
@@ -259,18 +306,223 @@ function logActivity(text, type = 'info') {
   logs.unshift(newLog);
   if (logs.length > 25) logs.pop();
   saveData();
-  renderDashboard();
+  if (currentView === 'dashboard') renderDashboard();
 }
 
 // ==========================================
-// 3. NAVIGATION & VIEW SWITCHING
+// 3. AUTHENTICATION & ROLE MANAGEMENT
+// ==========================================
+
+function switchAuthTab(tab) {
+  const loginTab = document.getElementById('tab-btn-login');
+  const regTab = document.getElementById('tab-btn-register');
+  const loginForm = document.getElementById('form-login');
+  const regForm = document.getElementById('form-register');
+
+  if (tab === 'login') {
+    loginTab.className = "flex-1 py-3 text-center border-b-2 border-indigo-600 text-indigo-700 bg-white font-bold transition";
+    regTab.className = "flex-1 py-3 text-center border-b-2 border-transparent text-slate-600 hover:text-slate-900 transition";
+    loginForm.classList.remove('hidden');
+    regForm.classList.add('hidden');
+  } else {
+    regTab.className = "flex-1 py-3 text-center border-b-2 border-emerald-600 text-emerald-700 bg-white font-bold transition";
+    loginTab.className = "flex-1 py-3 text-center border-b-2 border-transparent text-slate-600 hover:text-slate-900 transition";
+    regForm.classList.remove('hidden');
+    loginForm.classList.add('hidden');
+  }
+}
+
+function quickFillCredentials(user, pass) {
+  switchAuthTab('login');
+  document.getElementById('login-username').value = user;
+  document.getElementById('login-password').value = pass;
+}
+
+function toggleInputPassword(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.innerHTML = '<i class="fa-regular fa-eye-slash text-xs"></i>';
+  } else {
+    input.type = 'password';
+    btn.innerHTML = '<i class="fa-regular fa-eye text-xs"></i>';
+  }
+}
+
+function handleLogin(event) {
+  event.preventDefault();
+  const username = document.getElementById('login-username').value.trim();
+  const password = document.getElementById('login-password').value.trim();
+
+  // Check 1: Admin Login (admin / 123)
+  if (username.toLowerCase() === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
+    currentUser = {
+      role: 'admin',
+      username: 'admin',
+      name: ADMIN_CREDENTIALS.name,
+      email: ADMIN_CREDENTIALS.email
+    };
+    saveData();
+    applyAuthState();
+    showToast(`Welcome back, Administrator!`, 'success');
+    logActivity('Admin signed in to management console', 'system');
+    return;
+  }
+
+  // Check 2: Member Login (checks registered members by username & password)
+  const member = members.find(m => 
+    m.username && m.username.toLowerCase() === username.toLowerCase() && m.password === password
+  );
+
+  if (member) {
+    if (member.status === 'Suspended') {
+      showToast('Your account is currently suspended. Please contact the library administrator.', 'error');
+      return;
+    }
+
+    currentUser = {
+      ...member,
+      role: 'member'
+    };
+    saveData();
+    applyAuthState();
+    showToast(`Welcome back, ${member.name}!`, 'success');
+    logActivity(`Member '${member.name}' (${member.username}) logged in`, 'member');
+    return;
+  }
+
+  showToast('Invalid username or password. Please try again.', 'error');
+}
+
+function handleRegister(event) {
+  event.preventDefault();
+  const name = document.getElementById('reg-name').value.trim();
+  const username = document.getElementById('reg-username').value.trim();
+  const password = document.getElementById('reg-password').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const phone = document.getElementById('reg-phone').value.trim();
+  const tier = document.getElementById('reg-tier').value;
+
+  if (!name || !username || !password || !email || !phone) {
+    showToast('Please complete all registration fields.', 'error');
+    return;
+  }
+
+  // Check uniqueness of username
+  if (username.toLowerCase() === 'admin' || members.some(m => m.username && m.username.toLowerCase() === username.toLowerCase())) {
+    showToast(`Username '${username}' is already taken. Please choose another.`, 'error');
+    return;
+  }
+
+  const newId = `MEM-${1000 + members.length + 1}`;
+  const newMember = {
+    id: newId,
+    name,
+    username,
+    password,
+    email,
+    phone,
+    tier,
+    status: 'Active',
+    address: 'Registered Online',
+    joinDate: new Date().toISOString().split('T')[0]
+  };
+
+  members.push(newMember);
+  currentUser = { ...newMember, role: 'member' };
+  
+  saveData();
+  logActivity(`New member registered account: ${name} (${username})`, 'member');
+  applyAuthState();
+  showToast(`Account created successfully! Welcome to Alexandria, ${name}!`, 'success');
+}
+
+function handleLogout() {
+  const wasAdmin = currentUser && currentUser.role === 'admin';
+  currentUser = null;
+  saveData();
+  applyAuthState();
+  showToast('You have signed out successfully.', 'info');
+}
+
+// Update UI layout based on logged-in state and role
+function applyAuthState() {
+  const authScreen = document.getElementById('auth-screen');
+  const mainApp = document.getElementById('main-app');
+
+  if (!currentUser) {
+    authScreen.classList.remove('hidden');
+    mainApp.classList.add('hidden');
+    document.getElementById('login-username').value = '';
+    document.getElementById('login-password').value = '';
+    return;
+  }
+
+  authScreen.classList.add('hidden');
+  mainApp.classList.remove('hidden');
+
+  // Role Configuration
+  const isAdmin = currentUser.role === 'admin';
+
+  // Toggle admin-only elements
+  document.querySelectorAll('.admin-only').forEach(el => {
+    if (isAdmin) {
+      el.classList.remove('hidden');
+    } else {
+      el.classList.add('hidden');
+    }
+  });
+
+  // User badge and sidebar display
+  const userRoleEl = document.getElementById('sidebar-user-role');
+  const userNameEl = document.getElementById('sidebar-user-name');
+  const userAvatarEl = document.getElementById('sidebar-user-avatar');
+  const topBadgeEl = document.getElementById('top-user-badge');
+
+  if (isAdmin) {
+    userRoleEl.innerText = "Administrator";
+    userRoleEl.className = "text-[11px] text-amber-400 font-bold";
+    userNameEl.innerText = currentUser.name;
+    userAvatarEl.innerHTML = `<i class="fa-solid fa-user-shield text-amber-400"></i>`;
+    topBadgeEl.innerHTML = `<i class="fa-solid fa-user-shield text-amber-500 mr-1"></i> Admin (${currentUser.username})`;
+    topBadgeEl.className = "px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-900 border border-amber-200";
+
+    // Navigation Labels
+    document.getElementById('nav-circulation-label').innerText = "Circulation / Loans";
+    document.getElementById('dash-role-badge').innerHTML = `<i class="fa-solid fa-user-shield"></i> Administrator Dashboard`;
+    document.getElementById('dash-greeting').innerText = `Welcome to The Alexandria Athenaeum`;
+  } else {
+    userRoleEl.innerText = `${currentUser.tier} Patron`;
+    userRoleEl.className = "text-[11px] text-emerald-400 font-semibold";
+    userNameEl.innerText = currentUser.name;
+    const initials = currentUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+    userAvatarEl.innerHTML = `<span>${initials}</span>`;
+    topBadgeEl.innerHTML = `<i class="fa-solid fa-id-card text-emerald-500 mr-1"></i> Member: ${currentUser.name} (${currentUser.tier})`;
+    topBadgeEl.className = "px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-900 border border-emerald-200";
+
+    // Relabel Circulation for member
+    document.getElementById('nav-circulation-label').innerText = "My Borrowed Books";
+    document.getElementById('dash-role-badge').innerHTML = `<i class="fa-solid fa-graduation-cap"></i> Member Scholar Portal`;
+    document.getElementById('dash-greeting').innerText = `Welcome back, ${currentUser.name.split(' ')[0]}!`;
+  }
+
+  // Switch to default view
+  switchView('dashboard');
+}
+
+// ==========================================
+// 4. NAVIGATION & VIEW SWITCHING
 // ==========================================
 
 function switchView(viewName) {
+  // Guard admin views
+  if (currentUser && currentUser.role !== 'admin' && (viewName === 'members' || viewName === 'library-info')) {
+    viewName = 'dashboard';
+  }
+
   currentView = viewName;
-  
-  // Views elements
   const views = ['dashboard', 'books', 'members', 'circulation', 'library-info'];
+
   views.forEach(v => {
     const el = document.getElementById(`view-${v}`);
     const navBtn = document.getElementById(`nav-${v}`);
@@ -292,13 +544,29 @@ function switchView(viewName) {
     }
   });
 
-  // Update Header Titles
+  // Title mappings
+  const isAdmin = currentUser && currentUser.role === 'admin';
   const titleMap = {
-    'dashboard': { title: "System Dashboard", subtitle: "Overview of volumes, active scholars, and library operations" },
-    'books': { title: "Books Catalog", subtitle: "Browse, search, add, edit, and curate book titles & covers" },
-    'members': { title: "Members Directory", subtitle: "Manage library patron accounts, categories, and borrowing limits" },
-    'circulation': { title: "Circulation Desk", subtitle: "Track volume checkouts, returns, and overdue dates" },
-    'library-info': { title: "Institutional Profile", subtitle: "Operating hours, policies, curation team, and data management" }
+    'dashboard': { 
+      title: isAdmin ? "System Dashboard" : "Patron Dashboard", 
+      subtitle: isAdmin ? "Catalog overview, active scholar statistics, and operations" : "Your active book loans, personal reading list, and discovery" 
+    },
+    'books': { 
+      title: "Books Catalog", 
+      subtitle: isAdmin ? "Catalog, add, edit, remove, and manage book volumes & cover art" : "Search and borrow physical and digital book volumes" 
+    },
+    'members': { 
+      title: "Members & Credentials Management", 
+      subtitle: "View patron records, contact details, and manage login usernames & passwords" 
+    },
+    'circulation': { 
+      title: isAdmin ? "Circulation Desk" : "My Borrowed Books & Loans", 
+      subtitle: isAdmin ? "Manage volume checkouts, returns, and overdue dates" : "Track due dates, loan periods, and return books" 
+    },
+    'library-info': { 
+      title: "Institutional Profile", 
+      subtitle: "Operating schedule, loan guidelines, and system backup management" 
+    }
   };
 
   if (titleMap[viewName]) {
@@ -306,13 +574,13 @@ function switchView(viewName) {
     document.getElementById('page-subtitle').innerText = titleMap[viewName].subtitle;
   }
 
-  // Refresh relevant view
+  // Refresh view
   if (viewName === 'dashboard') renderDashboard();
   if (viewName === 'books') renderBooks();
   if (viewName === 'members') renderMembers();
   if (viewName === 'circulation') renderCirculation();
   if (viewName === 'library-info') renderLibraryProfile();
-  
+
   updateBadges();
 }
 
@@ -342,42 +610,63 @@ function updateBadges() {
   const badgeMembers = document.getElementById('badge-total-members');
   const badgeLoans = document.getElementById('badge-active-loans');
 
-  const activeLoansCount = loans.filter(l => !l.returnDate).length;
+  const isAdmin = currentUser && currentUser.role === 'admin';
+  const relevantLoans = isAdmin 
+    ? loans.filter(l => !l.returnDate)
+    : loans.filter(l => l.memberId === currentUser.id && !l.returnDate);
 
   if (badgeBooks) badgeBooks.innerText = books.length;
   if (badgeMembers) badgeMembers.innerText = members.length;
-  if (badgeLoans) badgeLoans.innerText = activeLoansCount;
+  if (badgeLoans) badgeLoans.innerText = relevantLoans.length;
 }
 
 // ==========================================
-// 4. RENDERING VIEWS
+// 5. VIEW RENDERING
 // ==========================================
 
-function renderAllViews() {
-  renderDashboard();
-  renderBooks();
-  renderMembers();
-  renderCirculation();
-  renderLibraryProfile();
-  updateBadges();
-}
-
-// --- Dashboard View ---
 function renderDashboard() {
+  const isAdmin = currentUser && currentUser.role === 'admin';
   const totalBooks = books.length;
   const totalCopies = books.reduce((sum, b) => sum + (parseInt(b.copies) || 1), 0);
   const totalAvailable = books.reduce((sum, b) => sum + (parseInt(b.available) || 0), 0);
-  const activeMembers = members.filter(m => m.status === 'Active').length;
-  const activeLoans = loans.filter(l => !l.returnDate).length;
-  
   const uniqueCategories = new Set(books.map(b => b.category)).size;
 
   document.getElementById('dash-kpi-books').innerText = totalBooks;
   document.getElementById('dash-kpi-available').innerText = `${totalAvailable} / ${totalCopies} Available`;
-  document.getElementById('dash-kpi-members').innerText = members.length;
-  document.getElementById('dash-kpi-active-members').innerText = activeMembers;
-  document.getElementById('dash-kpi-issued').innerText = activeLoans;
   document.getElementById('dash-kpi-categories').innerText = uniqueCategories;
+
+  const kpi2Title = document.getElementById('dash-kpi2-title');
+  const kpi2Val = document.getElementById('dash-kpi-members');
+  const kpi2Desc = document.getElementById('dash-kpi2-desc');
+
+  const kpi3Title = document.getElementById('dash-kpi3-title');
+  const kpi3Val = document.getElementById('dash-kpi-issued');
+  const kpi3Desc = document.getElementById('dash-kpi3-desc');
+
+  if (isAdmin) {
+    kpi2Title.innerText = "Registered Members";
+    kpi2Val.innerText = members.length;
+    kpi2Desc.innerText = `${members.filter(m => m.status === 'Active').length} Active accounts`;
+
+    kpi3Title.innerText = "Books Checked Out";
+    kpi3Val.innerText = loans.filter(l => !l.returnDate).length;
+    kpi3Desc.innerText = "Active borrower loans";
+    document.getElementById('dash-loans-heading').innerText = "Active Library Loans";
+  } else {
+    // Member Dashboard statistics
+    const myActiveLoans = loans.filter(l => l.memberId === currentUser.id && !l.returnDate);
+    const tierLimits = { 'Student': 3, 'Standard': 5, 'Premium': 10, 'Faculty': 15 };
+    const myLimit = tierLimits[currentUser.tier] || 5;
+
+    kpi2Title.innerText = "My Loan Quota";
+    kpi2Val.innerText = `${myActiveLoans.length} / ${myLimit}`;
+    kpi2Desc.innerText = `${currentUser.tier} Tier Allowance`;
+
+    kpi3Title.innerText = "My Active Loans";
+    kpi3Val.innerText = myActiveLoans.length;
+    kpi3Desc.innerText = "Books in your possession";
+    document.getElementById('dash-loans-heading').innerText = "My Borrowed Books";
+  }
 
   // Recent Books
   const recentBooksContainer = document.getElementById('dash-recent-books');
@@ -411,21 +700,24 @@ function renderDashboard() {
   // Active Loans mini list
   const activeLoansContainer = document.getElementById('dash-active-loans');
   activeLoansContainer.innerHTML = '';
-  const pendingLoans = loans.filter(l => !l.returnDate).slice(0, 4);
 
-  if (pendingLoans.length === 0) {
-    activeLoansContainer.innerHTML = `<p class="text-xs text-slate-400 italic">No books currently loaned out.</p>`;
+  const relevantLoans = isAdmin
+    ? loans.filter(l => !l.returnDate).slice(0, 4)
+    : loans.filter(l => l.memberId === currentUser.id && !l.returnDate).slice(0, 4);
+
+  if (relevantLoans.length === 0) {
+    activeLoansContainer.innerHTML = `<p class="text-xs text-slate-400 italic">${isAdmin ? 'No books currently checked out.' : 'You have no books currently on loan.'}</p>`;
   } else {
-    pendingLoans.forEach(loan => {
+    relevantLoans.forEach(loan => {
       const book = books.find(b => b.id === loan.bookId) || { title: 'Unknown Title' };
-      const member = members.find(m => m.id === loan.memberId) || { name: 'Unknown Member' };
+      const member = members.find(m => m.id === loan.memberId) || { name: 'Unknown' };
 
       const item = document.createElement('div');
       item.className = "p-3 rounded-xl bg-slate-50 border border-slate-200/60 flex items-center justify-between text-xs";
       item.innerHTML = `
         <div class="space-y-0.5">
           <p class="font-semibold text-slate-800 line-clamp-1">${escapeHtml(book.title)}</p>
-          <p class="text-[11px] text-slate-500">Borrower: ${escapeHtml(member.name)}</p>
+          <p class="text-[11px] text-slate-500">${isAdmin ? `Borrower: ${escapeHtml(member.name)}` : `Due: ${loan.dueDate}`}</p>
         </div>
         <button onclick="handleReturnBook('${loan.id}')" class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold rounded-lg text-[11px] transition">
           Return
@@ -435,7 +727,7 @@ function renderDashboard() {
     });
   }
 
-  // System Audit Trail
+  // Audit Log (Recent activity)
   const logContainer = document.getElementById('dash-activity-log');
   logContainer.innerHTML = '';
   logs.slice(0, 5).forEach(log => {
@@ -452,9 +744,7 @@ function renderDashboard() {
   });
 }
 
-// --- Procedural Fallback Cover Helper ---
 function generateProceduralCoverHtml(book) {
-  // Vibrant scholarly color combinations
   const gradients = [
     'linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%)',
     'linear-gradient(135deg, #064e3b 0%, #022c22 100%)',
@@ -487,6 +777,7 @@ function renderBooks() {
   const search = (document.getElementById('book-search-input')?.value || '').toLowerCase().trim();
   const categoryFilter = document.getElementById('book-category-filter')?.value || 'ALL';
   const statusFilter = document.getElementById('book-status-filter')?.value || 'ALL';
+  const isAdmin = currentUser && currentUser.role === 'admin';
 
   const filtered = books.filter(book => {
     const matchesSearch = 
@@ -528,7 +819,7 @@ function renderBooks() {
     filtered.forEach(book => {
       const card = document.createElement('div');
       card.className = "book-card bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-xs hover:shadow-lg transition flex flex-col justify-between";
-      
+
       const coverHtml = book.coverImage
         ? `<img src="${escapeHtml(book.coverImage)}" alt="${escapeHtml(book.title)}" class="w-full h-full object-cover">`
         : generateProceduralCoverHtml(book);
@@ -537,9 +828,44 @@ function renderBooks() {
         ? `<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold badge-available"><i class="fa-solid fa-circle-check mr-1 text-[10px]"></i> ${book.available}/${book.copies} Available</span>`
         : `<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold badge-out-of-stock"><i class="fa-solid fa-circle-xmark mr-1 text-[10px]"></i> Out of Stock</span>`;
 
+      // Bottom action bar based on role
+      let actionBarHtml = '';
+      if (isAdmin) {
+        actionBarHtml = `
+          <div class="px-4 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
+            <button onclick="viewBookDetails('${book.id}')" class="text-xs font-semibold text-slate-700 hover:text-indigo-600 flex items-center gap-1">
+              <i class="fa-solid fa-eye"></i> Details
+            </button>
+            <div class="flex items-center gap-1.5">
+              <button onclick="openEditBookModal('${book.id}')" title="Edit Book or Image" class="p-2 text-slate-500 hover:text-indigo-600 hover:bg-white rounded-lg transition">
+                <i class="fa-solid fa-pen-to-square"></i>
+              </button>
+              <button onclick="confirmDeleteBook('${book.id}')" title="Remove Book" class="p-2 text-slate-500 hover:text-rose-600 hover:bg-white rounded-lg transition">
+                <i class="fa-solid fa-trash-can"></i>
+              </button>
+            </div>
+          </div>
+        `;
+      } else {
+        // Member view
+        actionBarHtml = `
+          <div class="px-4 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
+            <button onclick="viewBookDetails('${book.id}')" class="text-xs font-semibold text-slate-700 hover:text-indigo-600 flex items-center gap-1">
+              <i class="fa-solid fa-eye"></i> Details
+            </button>
+            ${book.available > 0 ? `
+              <button onclick="quickMemberBorrow('${book.id}')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition flex items-center gap-1">
+                <i class="fa-solid fa-arrow-right-arrow-left"></i> Borrow
+              </button>
+            ` : `
+              <span class="text-xs text-rose-500 font-medium italic">Checked Out</span>
+            `}
+          </div>
+        `;
+      }
+
       card.innerHTML = `
         <div>
-          <!-- Book Cover -->
           <div class="book-cover-container relative aspect-[2/3] w-full overflow-hidden cursor-pointer" onclick="viewBookDetails('${book.id}')">
             ${coverHtml}
             <div class="absolute top-2.5 right-2.5">
@@ -556,7 +882,6 @@ function renderBooks() {
             `}
           </div>
 
-          <!-- Book Metadata -->
           <div class="p-4 space-y-2">
             <span class="text-[10px] uppercase font-bold text-indigo-600 tracking-wider bg-indigo-50 px-2 py-0.5 rounded-md">${escapeHtml(book.category)}</span>
             <h4 class="font-bold text-slate-900 text-sm font-serif line-clamp-1 hover:text-indigo-600 cursor-pointer" onclick="viewBookDetails('${book.id}')">
@@ -570,20 +895,7 @@ function renderBooks() {
           </div>
         </div>
 
-        <!-- Quick Action Bar -->
-        <div class="px-4 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
-          <button onclick="viewBookDetails('${book.id}')" class="text-xs font-semibold text-slate-700 hover:text-indigo-600 flex items-center gap-1">
-            <i class="fa-solid fa-eye"></i> Details
-          </button>
-          <div class="flex items-center gap-1.5">
-            <button onclick="openEditBookModal('${book.id}')" title="Edit Book or Image" class="p-2 text-slate-500 hover:text-indigo-600 hover:bg-white rounded-lg transition">
-              <i class="fa-solid fa-pen-to-square"></i>
-            </button>
-            <button onclick="confirmDeleteBook('${book.id}')" title="Remove Book" class="p-2 text-slate-500 hover:text-rose-600 hover:bg-white rounded-lg transition">
-              <i class="fa-solid fa-trash-can"></i>
-            </button>
-          </div>
-        </div>
+        ${actionBarHtml}
       `;
       gridContainer.appendChild(card);
     });
@@ -597,10 +909,38 @@ function renderBooks() {
     filtered.forEach(book => {
       const tr = document.createElement('tr');
       tr.className = "hover:bg-slate-50/80 transition";
-      
+
       const smallThumb = book.coverImage
         ? `<img src="${escapeHtml(book.coverImage)}" class="w-10 h-14 object-cover rounded shadow-xs">`
         : `<div class="w-10 h-14 rounded bg-slate-800 text-amber-400 flex items-center justify-center text-xs font-bold"><i class="fa-solid fa-book"></i></div>`;
+
+      let actionsCell = '';
+      if (isAdmin) {
+        actionsCell = `
+          <button onclick="viewBookDetails('${book.id}')" class="px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition" title="Inspect">
+            <i class="fa-solid fa-eye"></i>
+          </button>
+          <button onclick="openEditBookModal('${book.id}')" class="px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition" title="Edit">
+            <i class="fa-solid fa-pen-to-square"></i>
+          </button>
+          <button onclick="confirmDeleteBook('${book.id}')" class="px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-lg transition" title="Remove">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        `;
+      } else {
+        actionsCell = `
+          <button onclick="viewBookDetails('${book.id}')" class="px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition">
+            <i class="fa-solid fa-eye mr-1"></i> Details
+          </button>
+          ${book.available > 0 ? `
+            <button onclick="quickMemberBorrow('${book.id}')" class="px-2.5 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition">
+              Borrow
+            </button>
+          ` : `
+            <span class="text-xs text-rose-500 italic px-2">Unavailable</span>
+          `}
+        `;
+      }
 
       tr.innerHTML = `
         <td class="py-3 px-4 flex items-center gap-3">
@@ -623,15 +963,7 @@ function renderBooks() {
             : `<span class="badge-out-of-stock px-2 py-0.5 rounded-full text-xs font-medium">Out of Stock</span>`}
         </td>
         <td class="py-3 px-4 text-right space-x-1">
-          <button onclick="viewBookDetails('${book.id}')" class="px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition" title="Inspect">
-            <i class="fa-solid fa-eye"></i>
-          </button>
-          <button onclick="openEditBookModal('${book.id}')" class="px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition" title="Edit">
-            <i class="fa-solid fa-pen-to-square"></i>
-          </button>
-          <button onclick="confirmDeleteBook('${book.id}')" class="px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-lg transition" title="Remove">
-            <i class="fa-solid fa-trash-can"></i>
-          </button>
+          ${actionsCell}
         </td>
       `;
       tableBody.appendChild(tr);
@@ -660,7 +992,7 @@ function populateCategoryFilter() {
   });
 }
 
-// --- Members View ---
+// --- Members View (Admin Can View and Manage Member Logins) ---
 function renderMembers() {
   const search = (document.getElementById('member-search-input')?.value || '').toLowerCase().trim();
   const tierFilter = document.getElementById('member-tier-filter')?.value || 'ALL';
@@ -669,7 +1001,8 @@ function renderMembers() {
     const matchesSearch = 
       member.name.toLowerCase().includes(search) ||
       member.email.toLowerCase().includes(search) ||
-      member.id.toLowerCase().includes(search);
+      member.id.toLowerCase().includes(search) ||
+      (member.username && member.username.toLowerCase().includes(search));
 
     const matchesTier = tierFilter === 'ALL' || member.tier === tierFilter;
     return matchesSearch && matchesTier;
@@ -690,12 +1023,11 @@ function renderMembers() {
 
   filtered.forEach(member => {
     const activeBorrowedCount = loans.filter(l => l.memberId === member.id && !l.returnDate).length;
-
     const tr = document.createElement('tr');
     tr.className = "hover:bg-slate-50/80 transition";
-    
-    // Member initials avatar
+
     const initials = member.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+    const isPasswordRevealed = revealedPasswords.has(member.id);
 
     const tierBadges = {
       'Faculty': 'bg-purple-50 text-purple-700 border-purple-200',
@@ -717,6 +1049,29 @@ function renderMembers() {
         </div>
       </td>
       <td class="py-3.5 px-4 font-mono text-xs font-semibold text-slate-700">${escapeHtml(member.id)}</td>
+      
+      <!-- Admin View & Manage Member Credentials -->
+      <td class="py-3.5 px-4 bg-amber-50/40 border-x border-amber-200/50">
+        <div class="space-y-1">
+          <div class="flex items-center gap-1.5 text-xs">
+            <span class="text-slate-400">User:</span>
+            <code class="font-bold text-indigo-900 bg-white px-1.5 py-0.5 rounded border border-slate-200">${escapeHtml(member.username || 'unassigned')}</code>
+          </div>
+          <div class="flex items-center gap-1.5 text-xs">
+            <span class="text-slate-400">Pass:</span>
+            <span class="font-mono text-slate-800 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+              ${isPasswordRevealed ? escapeHtml(member.password) : '••••••'}
+            </span>
+            <button onclick="togglePasswordReveal('${member.id}')" title="${isPasswordRevealed ? 'Hide Password' : 'Show Password'}" class="text-amber-700 hover:text-amber-900 p-1">
+              <i class="fa-regular ${isPasswordRevealed ? 'fa-eye-slash' : 'fa-eye'} text-xs"></i>
+            </button>
+            <button onclick="openEditMemberModal('${member.id}')" title="Change/Manage Password" class="text-indigo-600 hover:text-indigo-800 text-[10px] underline ml-1">
+              Edit
+            </button>
+          </div>
+        </div>
+      </td>
+
       <td class="py-3.5 px-4">
         <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full border ${tierBadgeClass}">
           ${escapeHtml(member.tier)}
@@ -737,7 +1092,7 @@ function renderMembers() {
         </span>
       </td>
       <td class="py-3.5 px-4 text-right space-x-1">
-        <button onclick="openEditMemberModal('${member.id}')" title="Edit Member Record" class="px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-emerald-700 hover:bg-slate-100 rounded-lg transition">
+        <button onclick="openEditMemberModal('${member.id}')" title="Edit Profile & Password" class="px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-emerald-700 hover:bg-slate-100 rounded-lg transition">
           <i class="fa-solid fa-user-pen"></i>
         </button>
         <button onclick="confirmDeleteMember('${member.id}')" title="Remove Member" class="px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-lg transition">
@@ -753,14 +1108,31 @@ function filterMembers() {
   renderMembers();
 }
 
+function togglePasswordReveal(memberId) {
+  if (revealedPasswords.has(memberId)) {
+    revealedPasswords.delete(memberId);
+  } else {
+    revealedPasswords.add(memberId);
+  }
+  renderMembers();
+}
+
 // --- Circulation View ---
 function renderCirculation() {
   const tableBody = document.getElementById('loans-table-body');
   const emptyState = document.getElementById('loans-empty-state');
+  const isAdmin = currentUser && currentUser.role === 'admin';
 
-  if (loans.length === 0) {
+  const relevantLoans = isAdmin
+    ? loans
+    : loans.filter(l => l.memberId === currentUser.id);
+
+  if (relevantLoans.length === 0) {
     tableBody.parentElement.parentElement.classList.add('hidden');
     emptyState.classList.remove('hidden');
+    document.getElementById('loans-empty-title').innerText = isAdmin 
+      ? "No outstanding book loans" 
+      : "You have no active book loans";
     return;
   }
 
@@ -768,7 +1140,7 @@ function renderCirculation() {
   tableBody.parentElement.parentElement.classList.remove('hidden');
   tableBody.innerHTML = '';
 
-  loans.forEach(loan => {
+  relevantLoans.forEach(loan => {
     const book = books.find(b => b.id === loan.bookId) || { title: 'Unknown Book', isbn: 'N/A' };
     const member = members.find(m => m.id === loan.memberId) || { name: 'Unknown Patron', email: 'N/A' };
 
@@ -803,10 +1175,10 @@ function renderCirculation() {
       <td class="py-3.5 px-4 text-right">
         ${!isReturned ? `
           <button onclick="handleReturnBook('${loan.id}')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl shadow-xs transition">
-            <i class="fa-solid fa-rotate-left mr-1"></i> Process Return
+            <i class="fa-solid fa-rotate-left mr-1"></i> Return Book
           </button>
         ` : `
-          <span class="text-xs text-slate-400 italic">Closed on ${loan.returnDate}</span>
+          <span class="text-xs text-slate-400 italic">Returned on ${loan.returnDate}</span>
         `}
       </td>
     `;
@@ -823,46 +1195,39 @@ function renderLibraryProfile() {
   document.getElementById('info-phone').innerText = libraryProfile.phone;
   document.getElementById('info-email').innerText = libraryProfile.email;
 
-  // Header & Sidebar bindings
   document.getElementById('sidebar-lib-name').innerText = libraryProfile.name.split(' ')[0] + " Library";
-  document.getElementById('sidebar-librarian-name').innerText = libraryProfile.librarian.split(',')[0];
-  document.getElementById('dash-lib-heading').innerText = libraryProfile.name;
   document.getElementById('dash-lib-tagline').innerText = libraryProfile.tagline;
   document.getElementById('dash-hours').innerText = libraryProfile.hours;
   document.getElementById('dash-phone').innerText = libraryProfile.phone;
 }
 
 // ==========================================
-// 5. BOOK CRUD & IMAGE MANAGEMENT
+// 6. BOOK MANAGEMENT & IMAGE UPLOAD/REMOVE
 // ==========================================
 
-// Handle Image from Local File Upload (converts to Base64 data URL)
 function handleBookImageFile(event) {
   const file = event.target.files[0];
   if (!file) return;
 
   if (!file.type.startsWith('image/')) {
-    showToast('Please select a valid image file (JPG, PNG, WebP).', 'error');
+    showToast('Please select an image file (JPG, PNG, WebP).', 'error');
     return;
   }
 
-  // Max 5MB safety limit
   if (file.size > 5 * 1024 * 1024) {
-    showToast('Image file too large! Please choose an image under 5MB.', 'error');
+    showToast('Image file too large! Maximum 5MB.', 'error');
     return;
   }
 
   const reader = new FileReader();
   reader.onload = function(e) {
     setBookModalImage(e.target.result);
-    // Clear URL input since file was chosen
     document.getElementById('book-url-input').value = '';
     showToast('Cover image loaded successfully!', 'success');
   };
   reader.readAsDataURL(file);
 }
 
-// Handle Image from URL
 function handleBookImageUrl(url) {
   const trimmed = url.trim();
   if (trimmed) {
@@ -872,7 +1237,6 @@ function handleBookImageUrl(url) {
   }
 }
 
-// Set image in modal and display preview
 function setBookModalImage(imageSrc) {
   currentModalCoverImage = imageSrc;
   const preview = document.getElementById('book-image-preview');
@@ -895,7 +1259,7 @@ function setBookModalImage(imageSrc) {
   }
 }
 
-// Remove Book Image function (Option explicitly required by user!)
+// Option to REMOVE Book Image (Required by user!)
 function removeBookImage() {
   currentModalCoverImage = null;
   document.getElementById('book-image-preview').src = '';
@@ -908,7 +1272,6 @@ function removeBookImage() {
   showToast('Book cover image removed. Standard academic cover will be used.', 'info');
 }
 
-// Save Book (Add or Update)
 function handleSaveBook(event) {
   event.preventDefault();
 
@@ -929,7 +1292,7 @@ function handleSaveBook(event) {
   }
 
   if (id) {
-    // EDIT EXISTING BOOK
+    // EDIT
     const index = books.findIndex(b => b.id === id);
     if (index !== -1) {
       const existing = books[index];
@@ -948,14 +1311,14 @@ function handleSaveBook(event) {
         location,
         publisher,
         description: desc,
-        coverImage: currentModalCoverImage || '' // Saved cover or empty
+        coverImage: currentModalCoverImage || ''
       };
 
       logActivity(`Updated volume '${title}' (Cover ${currentModalCoverImage ? 'updated' : 'removed/default'})`, 'book');
       showToast(`Book '${title}' updated successfully!`, 'success');
     }
   } else {
-    // ADD NEW BOOK
+    // ADD
     const newId = `BK-${1000 + books.length + 1}`;
     const newBook = {
       id: newId,
@@ -980,10 +1343,11 @@ function handleSaveBook(event) {
   saveData();
   closeModal('modal-add-book');
   populateCategoryFilter();
-  renderAllViews();
+  renderBooks();
+  renderDashboard();
+  updateBadges();
 }
 
-// Open Edit Book Modal
 function openEditBookModal(bookId) {
   const book = books.find(b => b.id === bookId);
   if (!book) return;
@@ -1000,7 +1364,6 @@ function openEditBookModal(bookId) {
   document.getElementById('book-input-publisher').value = book.publisher || '';
   document.getElementById('book-input-desc').value = book.description || '';
 
-  // Setup Cover Image
   if (book.coverImage) {
     setBookModalImage(book.coverImage);
     if (book.coverImage.startsWith('http')) {
@@ -1014,7 +1377,6 @@ function openEditBookModal(bookId) {
   openModal('modal-add-book');
 }
 
-// View Book Details Modal
 function viewBookDetails(bookId) {
   const book = books.find(b => b.id === bookId);
   if (!book) return;
@@ -1038,22 +1400,36 @@ function viewBookDetails(bookId) {
     coverContainer.innerHTML = generateProceduralCoverHtml(book);
   }
 
-  // Button handlers
-  document.getElementById('detail-btn-edit').onclick = () => openEditBookModal(book.id);
-  document.getElementById('detail-btn-delete').onclick = () => confirmDeleteBook(book.id);
+  const isAdmin = currentUser && currentUser.role === 'admin';
+  const memberBorrowBtn = document.getElementById('detail-btn-member-borrow');
+
+  if (isAdmin) {
+    memberBorrowBtn.classList.add('hidden');
+    document.getElementById('detail-btn-edit').onclick = () => openEditBookModal(book.id);
+    document.getElementById('detail-btn-delete').onclick = () => confirmDeleteBook(book.id);
+  } else {
+    // For Member
+    if (book.available > 0) {
+      memberBorrowBtn.classList.remove('hidden');
+      memberBorrowBtn.onclick = () => {
+        closeModal('modal-book-details');
+        quickMemberBorrow(book.id);
+      };
+    } else {
+      memberBorrowBtn.classList.add('hidden');
+    }
+  }
 
   openModal('modal-book-details');
 }
 
-// Delete Book confirmation
 function confirmDeleteBook(bookId) {
   const book = books.find(b => b.id === bookId);
   if (!book) return;
 
-  // Check if book has active unreturned loans
   const activeLoansForBook = loans.filter(l => l.bookId === bookId && !l.returnDate);
   if (activeLoansForBook.length > 0) {
-    showToast(`Cannot remove '${book.title}'. There are currently ${activeLoansForBook.length} copy/copies checked out!`, 'error');
+    showToast(`Cannot remove '${book.title}'. ${activeLoansForBook.length} copy is currently checked out!`, 'error');
     return;
   }
 
@@ -1064,14 +1440,14 @@ function confirmDeleteBook(bookId) {
   };
 
   document.getElementById('delete-confirm-title').innerText = "Remove Book from Catalog";
-  document.getElementById('delete-confirm-desc').innerText = `Are you sure you want to permanently delete "${book.title}" by ${book.author} from the library system?`;
+  document.getElementById('delete-confirm-desc').innerText = `Are you sure you want to permanently delete "${book.title}" from the library system?`;
   
   closeModal('modal-book-details');
   openModal('modal-confirm-delete');
 }
 
 // ==========================================
-// 6. MEMBER CRUD MANAGEMENT
+// 7. MEMBER CRUD & ADMIN CREDENTIALS MANAGEMENT
 // ==========================================
 
 function handleSaveMember(event) {
@@ -1079,39 +1455,52 @@ function handleSaveMember(event) {
 
   const id = document.getElementById('member-form-id').value;
   const name = document.getElementById('member-input-name').value.trim();
+  const username = document.getElementById('member-input-username').value.trim();
+  const password = document.getElementById('member-input-password').value.trim();
   const email = document.getElementById('member-input-email').value.trim();
   const phone = document.getElementById('member-input-phone').value.trim();
   const tier = document.getElementById('member-input-tier').value;
   const status = document.getElementById('member-input-status').value;
   const address = document.getElementById('member-input-address').value.trim();
 
-  if (!name || !email || !phone) {
-    showToast('Please fill in all required member credentials.', 'error');
+  if (!name || !username || !password || !email || !phone) {
+    showToast('Please fill in all required fields including login credentials.', 'error');
+    return;
+  }
+
+  // Check username uniqueness
+  const duplicate = members.find(m => m.username.toLowerCase() === username.toLowerCase() && m.id !== id);
+  if (duplicate || username.toLowerCase() === 'admin') {
+    showToast(`Username '${username}' is already in use. Please select a unique username.`, 'error');
     return;
   }
 
   if (id) {
-    // Edit existing member
+    // EDIT
     const index = members.findIndex(m => m.id === id);
     if (index !== -1) {
       members[index] = {
         ...members[index],
         name,
+        username,
+        password,
         email,
         phone,
         tier,
         status,
         address
       };
-      logActivity(`Updated member profile for ${name}`, 'member');
-      showToast(`Member profile for ${name} updated.`, 'success');
+      logActivity(`Admin updated member & login credentials for ${name} (${username})`, 'member');
+      showToast(`Member profile and login for ${name} updated successfully!`, 'success');
     }
   } else {
-    // Add new member
+    // ADD
     const newId = `MEM-${1000 + members.length + 1}`;
     const newMember = {
       id: newId,
       name,
+      username,
+      password,
       email,
       phone,
       tier,
@@ -1120,22 +1509,26 @@ function handleSaveMember(event) {
       joinDate: new Date().toISOString().split('T')[0]
     };
     members.push(newMember);
-    logActivity(`Enrolled new ${tier} member: ${name} (${newId})`, 'member');
-    showToast(`New member ${name} enrolled with ID ${newId}!`, 'success');
+    logActivity(`Admin enrolled new member with login: ${name} (${username})`, 'member');
+    showToast(`New member ${name} created with username '${username}'!`, 'success');
   }
 
   saveData();
   closeModal('modal-add-member');
-  renderAllViews();
+  renderMembers();
+  renderDashboard();
+  updateBadges();
 }
 
 function openEditMemberModal(memberId) {
   const member = members.find(m => m.id === memberId);
   if (!member) return;
 
-  document.getElementById('modal-member-title').innerText = "Edit Member Information";
+  document.getElementById('modal-member-title').innerText = "Edit Member & Login Credentials";
   document.getElementById('member-form-id').value = member.id;
   document.getElementById('member-input-name').value = member.name;
+  document.getElementById('member-input-username').value = member.username || '';
+  document.getElementById('member-input-password').value = member.password || '';
   document.getElementById('member-input-email').value = member.email;
   document.getElementById('member-input-phone').value = member.phone;
   document.getElementById('member-input-tier').value = member.tier;
@@ -1149,7 +1542,6 @@ function confirmDeleteMember(memberId) {
   const member = members.find(m => m.id === memberId);
   if (!member) return;
 
-  // Check if member has active unreturned books
   const activeLoans = loans.filter(l => l.memberId === memberId && !l.returnDate);
   if (activeLoans.length > 0) {
     showToast(`Cannot remove ${member.name}. They currently hold ${activeLoans.length} unreturned book(s)!`, 'error');
@@ -1163,34 +1555,32 @@ function confirmDeleteMember(memberId) {
   };
 
   document.getElementById('delete-confirm-title').innerText = "De-enroll Member";
-  document.getElementById('delete-confirm-desc').innerText = `Are you sure you want to remove member account "${member.name}" (${member.id})?`;
+  document.getElementById('delete-confirm-desc').innerText = `Are you sure you want to remove member account "${member.name}" (${member.id})? Their login will also be deleted.`;
 
   openModal('modal-confirm-delete');
 }
 
 // ==========================================
-// 7. CIRCULATION (ISSUE & RETURN)
+// 8. CIRCULATION & BORROWING (ADMIN & MEMBER)
 // ==========================================
 
 function openIssueBookModal() {
   const bookSelect = document.getElementById('issue-select-book');
   const memberSelect = document.getElementById('issue-select-member');
 
-  // Fill available books (must have available copies > 0)
   bookSelect.innerHTML = '';
   const availableBooks = books.filter(b => b.available > 0);
   if (availableBooks.length === 0) {
-    bookSelect.innerHTML = '<option value="">No books currently available for checkout</option>';
+    bookSelect.innerHTML = '<option value="">No books currently available</option>';
   } else {
     availableBooks.forEach(b => {
       const opt = document.createElement('option');
       opt.value = b.id;
-      opt.innerText = `${b.title} (${b.available} available) - ${b.author}`;
+      opt.innerText = `${b.title} (${b.available} left) - ${b.author}`;
       bookSelect.appendChild(opt);
     });
   }
 
-  // Fill active members
   memberSelect.innerHTML = '';
   const activeMembers = members.filter(m => m.status === 'Active');
   if (activeMembers.length === 0) {
@@ -1204,7 +1594,6 @@ function openIssueBookModal() {
     });
   }
 
-  // Set default dates: Today and +14 days
   const today = new Date();
   const dueDate = new Date();
   dueDate.setDate(today.getDate() + 14);
@@ -1236,7 +1625,7 @@ function handleIssueBook(event) {
     return;
   }
 
-  // Check member borrowing limits
+  // Quota check
   const memberActiveLoans = loans.filter(l => l.memberId === memberId && !l.returnDate).length;
   const tierLimits = { 'Student': 3, 'Standard': 5, 'Premium': 10, 'Faculty': 15 };
   const maxAllowed = tierLimits[member.tier] || 5;
@@ -1246,7 +1635,6 @@ function handleIssueBook(event) {
     return;
   }
 
-  // Create Loan
   const newLoan = {
     id: `LN-${5000 + loans.length + 1}`,
     bookId: book.id,
@@ -1257,16 +1645,67 @@ function handleIssueBook(event) {
     status: "Active"
   };
 
-  // Decrement book availability
   book.available -= 1;
   loans.unshift(newLoan);
 
-  logActivity(`${member.name} checked out '${book.title}'`, 'loan');
-  showToast(`Book '${book.title}' issued to ${member.name}! Due on ${dueDate}.`, 'success');
+  logActivity(`Issued '${book.title}' to member ${member.name}`, 'loan');
+  showToast(`Book '${book.title}' successfully issued to ${member.name}! Due on ${dueDate}.`, 'success');
 
   saveData();
   closeModal('modal-issue-book');
-  renderAllViews();
+  renderBooks();
+  renderCirculation();
+  renderDashboard();
+  updateBadges();
+}
+
+// Quick borrow for logged in member
+function quickMemberBorrow(bookId) {
+  if (!currentUser || currentUser.role !== 'member') {
+    showToast('Please sign in as a member to borrow books.', 'error');
+    return;
+  }
+
+  const book = books.find(b => b.id === bookId);
+  if (!book || book.available <= 0) {
+    showToast('Sorry, this volume is currently out of stock.', 'error');
+    return;
+  }
+
+  const myActiveLoans = loans.filter(l => l.memberId === currentUser.id && !l.returnDate);
+  const tierLimits = { 'Student': 3, 'Standard': 5, 'Premium': 10, 'Faculty': 15 };
+  const maxAllowed = tierLimits[currentUser.tier] || 5;
+
+  if (myActiveLoans.length >= maxAllowed) {
+    showToast(`You have reached your borrowing limit of ${maxAllowed} books for the ${currentUser.tier} tier.`, 'error');
+    return;
+  }
+
+  const today = new Date();
+  const dueDate = new Date();
+  dueDate.setDate(today.getDate() + 14);
+
+  const newLoan = {
+    id: `LN-${5000 + loans.length + 1}`,
+    bookId: book.id,
+    memberId: currentUser.id,
+    borrowDate: today.toISOString().split('T')[0],
+    dueDate: dueDate.toISOString().split('T')[0],
+    returnDate: null,
+    status: "Active"
+  };
+
+  book.available -= 1;
+  loans.unshift(newLoan);
+
+  logActivity(`${currentUser.name} borrowed '${book.title}'`, 'loan');
+  showToast(`Success! '${book.title}' has been issued to you. Due on ${dueDate.toISOString().split('T')[0]}.`, 'success');
+
+  saveData();
+  renderBooks();
+  renderCirculation();
+  renderDashboard();
+  updateBadges();
 }
 
 function handleReturnBook(loanId) {
@@ -1284,14 +1723,17 @@ function handleReturnBook(loanId) {
   }
 
   logActivity(`Returned volume: '${book ? book.title : 'Book'}' by ${member ? member.name : 'Patron'}`, 'loan');
-  showToast(`Book successfully processed and returned to circulation!`, 'success');
+  showToast(`Book successfully returned to inventory!`, 'success');
 
   saveData();
-  renderAllViews();
+  renderBooks();
+  renderCirculation();
+  renderDashboard();
+  updateBadges();
 }
 
 // ==========================================
-// 8. EXECUTE DELETION (MODAL CONFIRMATION)
+// 9. EXECUTE DELETION
 // ==========================================
 
 function executeDeletion() {
@@ -1313,11 +1755,14 @@ function executeDeletion() {
   closeModal('modal-confirm-delete');
   activeDeleteTarget = null;
   populateCategoryFilter();
-  renderAllViews();
+  renderBooks();
+  renderMembers();
+  renderDashboard();
+  updateBadges();
 }
 
 // ==========================================
-// 9. LIBRARY PROFILE EDIT & DATA BACKUP
+// 10. LIBRARY PROFILE EDIT & BACKUP
 // ==========================================
 
 function openEditLibraryModal() {
@@ -1348,7 +1793,6 @@ function handleSaveLibraryProfile(event) {
   showToast('Library details updated successfully!', 'success');
 }
 
-// Export Full System to JSON File
 function exportData() {
   const exportPayload = {
     app: "Alexandria Library Management System",
@@ -1369,10 +1813,9 @@ function exportData() {
   downloadAnchor.click();
   downloadAnchor.remove();
 
-  showToast('Library archive successfully downloaded as JSON!', 'success');
+  showToast('Library database backup exported as JSON!', 'success');
 }
 
-// Import System from JSON File
 function importData(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -1389,22 +1832,26 @@ function importData(event) {
         if (data.logs) logs = data.logs;
 
         saveData();
-        renderAllViews();
+        renderBooks();
+        renderMembers();
+        renderCirculation();
+        renderDashboard();
+        renderLibraryProfile();
         populateCategoryFilter();
+        updateBadges();
         showToast('Library database restored successfully from JSON file!', 'success');
       } else {
         showToast('Invalid backup file structure.', 'error');
       }
     } catch (err) {
-      showToast('Error reading JSON backup file: ' + err.message, 'error');
+      showToast('Error reading backup file: ' + err.message, 'error');
     }
   };
   reader.readAsText(file);
 }
 
-// Reset to initial demo dataset
 function resetToSampleData() {
-  if (confirm("Reset library to original catalog and member records? Custom additions will be overwritten.")) {
+  if (confirm("Reset library to original demo catalog and member accounts?")) {
     books = [...DEFAULT_BOOKS];
     members = [...DEFAULT_MEMBERS];
     loans = [...DEFAULT_LOANS];
@@ -1412,21 +1859,25 @@ function resetToSampleData() {
     libraryProfile = { ...DEFAULT_PROFILE };
 
     saveData();
-    renderAllViews();
+    renderBooks();
+    renderMembers();
+    renderCirculation();
+    renderDashboard();
+    renderLibraryProfile();
     populateCategoryFilter();
-    showToast('Library restored to default demo records.', 'info');
+    updateBadges();
+    showToast('Library restored to default records.', 'info');
   }
 }
 
 // ==========================================
-// 10. MODALS & TOAST UTILITIES
+// 11. MODAL & UTILITY FUNCTIONS
 // ==========================================
 
 function openModal(modalId) {
   const modal = document.getElementById(modalId);
   if (!modal) return;
 
-  // Specific setup for Add Book modal if opening fresh
   if (modalId === 'modal-add-book' && !document.getElementById('book-form-id').value) {
     document.getElementById('modal-book-title').innerText = "Catalog New Book";
     document.getElementById('form-book').reset();
@@ -1434,7 +1885,6 @@ function openModal(modalId) {
     removeBookImage();
   }
 
-  // Specific setup for Add Member modal if opening fresh
   if (modalId === 'modal-add-member' && !document.getElementById('member-form-id').value) {
     document.getElementById('modal-member-title').innerText = "Enroll Library Member";
     document.getElementById('form-member').reset();
@@ -1464,7 +1914,6 @@ function closeModal(modalId) {
   modal.classList.add('hidden');
   document.body.style.overflow = '';
 
-  // Clear IDs
   if (modalId === 'modal-add-book') {
     document.getElementById('book-form-id').value = '';
     removeBookImage();
@@ -1475,7 +1924,6 @@ function closeModal(modalId) {
 }
 
 function setupEventListeners() {
-  // Close modals on backdrop click
   document.querySelectorAll('.modal-overlay').forEach(overlay => {
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay) {
@@ -1484,7 +1932,6 @@ function setupEventListeners() {
     });
   });
 
-  // Close modals on Escape key
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       document.querySelectorAll('.modal-overlay:not(.hidden)').forEach(modal => {
@@ -1493,7 +1940,6 @@ function setupEventListeners() {
     }
   });
 
-  // Setup delete confirmation button
   const deleteBtn = document.getElementById('btn-execute-delete');
   if (deleteBtn) {
     deleteBtn.onclick = executeDeletion;
@@ -1543,5 +1989,5 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
-// Start app on load
+// Start application
 window.addEventListener('DOMContentLoaded', initSystem);

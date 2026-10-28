@@ -38,551 +38,684 @@
     }
   </script>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex">
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen">
 
-  <!-- Sidebar Navigation -->
-  <aside class="w-64 bg-slate-900 text-slate-200 flex-shrink-0 hidden md:flex flex-col justify-between border-r border-slate-800 z-20">
-    <div>
-      <!-- Brand Logo / Details -->
-      <div class="h-20 flex items-center px-6 gap-3 border-b border-slate-800/80 bg-slate-950/40">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-600 to-amber-400 flex items-center justify-center text-white shadow-lg shadow-amber-500/20">
-          <i class="fa-solid fa-book-bookmark text-lg"></i>
+  <!-- ======================================================== -->
+  <!-- AUTHENTICATION SCREEN (LOGIN & MEMBER REGISTRATION) -->
+  <!-- ======================================================== -->
+  <div id="auth-screen" class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950">
+    <div class="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-800/20">
+      
+      <!-- Auth Header Banner -->
+      <div class="bg-slate-900 text-white p-7 text-center relative overflow-hidden">
+        <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-600 to-amber-400 mx-auto flex items-center justify-center text-white shadow-lg shadow-amber-500/25 mb-3 text-2xl">
+          <i class="fa-solid fa-book-bookmark"></i>
         </div>
+        <h1 class="text-2xl font-bold font-serif tracking-tight">Alexandria Library</h1>
+        <p class="text-xs text-slate-400 mt-1">Sign in to access your library account</p>
+
+        <!-- Decorative background shape -->
+        <div class="absolute -right-6 -bottom-6 opacity-10 text-7xl text-white pointer-events-none">
+          <i class="fa-solid fa-landmark"></i>
+        </div>
+      </div>
+
+      <!-- Auth Tabs: Login vs Member Sign-Up -->
+      <div class="flex border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600">
+        <button id="tab-btn-login" onclick="switchAuthTab('login')" class="flex-1 py-3 text-center border-b-2 border-indigo-600 text-indigo-700 bg-white font-bold transition">
+          <i class="fa-solid fa-arrow-right-to-bracket mr-1.5"></i> Sign In
+        </button>
+        <button id="tab-btn-register" onclick="switchAuthTab('register')" class="flex-1 py-3 text-center border-b-2 border-transparent hover:text-slate-900 transition">
+          <i class="fa-solid fa-user-plus mr-1.5"></i> Member Sign Up
+        </button>
+      </div>
+
+      <!-- Quick Credentials Hint Box -->
+      <div class="mx-6 mt-4 p-3.5 rounded-xl bg-amber-50/80 border border-amber-200/80 text-[11px] text-amber-900 space-y-1.5">
+        <p class="font-bold flex items-center gap-1.5 text-amber-950">
+          <i class="fa-solid fa-key text-amber-600"></i> Quick Login Credentials:
+        </p>
+        <div class="grid grid-cols-2 gap-2 pt-1 border-t border-amber-200/60">
+          <div class="cursor-pointer hover:bg-amber-100/60 p-1 rounded transition" onclick="quickFillCredentials('admin', '123')">
+            <span class="font-bold text-indigo-900 block"><i class="fa-solid fa-user-shield text-indigo-600"></i> Admin Login:</span>
+            User: <code class="font-bold">admin</code> | Pass: <code class="font-bold">123</code>
+          </div>
+          <div class="cursor-pointer hover:bg-amber-100/60 p-1 rounded transition" onclick="quickFillCredentials('marcus', '123')">
+            <span class="font-bold text-emerald-900 block"><i class="fa-solid fa-user text-emerald-600"></i> Member Login:</span>
+            User: <code class="font-bold">marcus</code> | Pass: <code class="font-bold">123</code>
+          </div>
+        </div>
+      </div>
+
+      <!-- Form 1: Login Form -->
+      <form id="form-login" onsubmit="handleLogin(event)" class="p-6 space-y-4">
         <div>
-          <h1 class="font-bold text-lg text-white tracking-tight flex items-center gap-1.5">
-            Alexandria <span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-normal">v2.5</span>
-          </h1>
-          <p class="text-xs text-slate-400" id="sidebar-lib-name">Central City Library</p>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Username</label>
+          <div class="relative">
+            <i class="fa-solid fa-user absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+            <input type="text" id="login-username" required placeholder="admin or member username" 
+                   class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition">
+          </div>
         </div>
-      </div>
 
-      <!-- Navigation Links -->
-      <nav class="p-4 space-y-1.5 text-sm font-medium">
-        <button onclick="switchView('dashboard')" id="nav-dashboard" class="nav-btn w-full flex items-center gap-3.5 px-4 py-3 rounded-xl transition text-white bg-slate-800 shadow-sm">
-          <i class="fa-solid fa-chart-pie w-5 text-amber-400"></i>
-          <span>Dashboard</span>
-        </button>
-        <button onclick="switchView('books')" id="nav-books" class="nav-btn w-full flex items-center justify-between px-4 py-3 rounded-xl transition text-slate-400 hover:text-white hover:bg-slate-800/50">
-          <div class="flex items-center gap-3.5">
-            <i class="fa-solid fa-book-open w-5 text-indigo-400"></i>
-            <span>Books Catalog</span>
-          </div>
-          <span id="badge-total-books" class="text-xs bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full">0</span>
-        </button>
-        <button onclick="switchView('members')" id="nav-members" class="nav-btn w-full flex items-center justify-between px-4 py-3 rounded-xl transition text-slate-400 hover:text-white hover:bg-slate-800/50">
-          <div class="flex items-center gap-3.5">
-            <i class="fa-solid fa-users w-5 text-emerald-400"></i>
-            <span>Members</span>
-          </div>
-          <span id="badge-total-members" class="text-xs bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full">0</span>
-        </button>
-        <button onclick="switchView('circulation')" id="nav-circulation" class="nav-btn w-full flex items-center justify-between px-4 py-3 rounded-xl transition text-slate-400 hover:text-white hover:bg-slate-800/50">
-          <div class="flex items-center gap-3.5">
-            <i class="fa-solid fa-arrow-right-arrow-left w-5 text-cyan-400"></i>
-            <span>Circulation / Loans</span>
-          </div>
-          <span id="badge-active-loans" class="text-xs bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full">0</span>
-        </button>
-        <button onclick="switchView('library-info')" id="nav-library-info" class="nav-btn w-full flex items-center gap-3.5 px-4 py-3 rounded-xl transition text-slate-400 hover:text-white hover:bg-slate-800/50">
-          <i class="fa-solid fa-building-columns w-5 text-rose-400"></i>
-          <span>Library Profile</span>
-        </button>
-      </nav>
-    </div>
-
-    <!-- Quick Librarian Info Card -->
-    <div class="p-4 m-3 rounded-xl bg-slate-800/70 border border-slate-700/60 text-xs text-slate-300 space-y-2">
-      <div class="flex items-center gap-2.5">
-        <div class="w-8 h-8 rounded-full bg-amber-500/20 text-amber-300 flex items-center justify-center font-bold">
-          <i class="fa-solid fa-user-shield"></i>
-        </div>
         <div>
-          <p class="font-semibold text-white" id="sidebar-librarian-name">Dr. Eleanor Vance</p>
-          <p class="text-slate-400 text-[11px]">Chief Curator & Admin</p>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Password</label>
+          <div class="relative">
+            <i class="fa-solid fa-lock absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+            <input type="password" id="login-password" required placeholder="Enter password (e.g. 123)" 
+                   class="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition">
+            <button type="button" onclick="toggleInputPassword('login-password', this)" class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+              <i class="fa-regular fa-eye text-xs"></i>
+            </button>
+          </div>
         </div>
-      </div>
-      <div class="pt-2 border-t border-slate-700/60 flex justify-between text-slate-400">
-        <span>Branch: Main Wing</span>
-        <span class="text-emerald-400 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Open</span>
-      </div>
-    </div>
-  </aside>
 
-  <!-- Mobile Top Navigation Bar -->
-  <div class="md:hidden fixed top-0 left-0 right-0 h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-4 z-40">
-    <div class="flex items-center gap-2">
-      <div class="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center text-white font-bold">
-        <i class="fa-solid fa-book-bookmark"></i>
+        <button type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-600/20 transition active:scale-95 flex items-center justify-center gap-2">
+          <i class="fa-solid fa-arrow-right-to-bracket"></i> Sign In to Library
+        </button>
+      </form>
+
+      <!-- Form 2: Member Self-Registration Form -->
+      <form id="form-register" onsubmit="handleRegister(event)" class="hidden p-6 space-y-3.5">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Full Legal Name <span class="text-rose-500">*</span></label>
+          <input type="text" id="reg-name" required placeholder="e.g. David Miller" 
+                 class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Choose Username <span class="text-rose-500">*</span></label>
+            <input type="text" id="reg-username" required placeholder="davidm" 
+                   class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Choose Password <span class="text-rose-500">*</span></label>
+            <input type="password" id="reg-password" required placeholder="Create password" 
+                   class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Email Address <span class="text-rose-500">*</span></label>
+            <input type="email" id="reg-email" required placeholder="david@example.com" 
+                   class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">Phone Number <span class="text-rose-500">*</span></label>
+            <input type="tel" id="reg-phone" required placeholder="+1 555-0199" 
+                   class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Membership Tier</label>
+          <select id="reg-tier" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
+            <option value="Student">Student (3 books loan quota)</option>
+            <option value="Standard" selected>Standard Reader (5 books quota)</option>
+            <option value="Premium">Scholar / Premium (10 books quota)</option>
+            <option value="Faculty">Faculty & Staff (15 books quota)</option>
+          </select>
+        </div>
+
+        <button type="submit" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-lg shadow-emerald-600/20 transition active:scale-95 flex items-center justify-center gap-2 mt-2">
+          <i class="fa-solid fa-user-plus"></i> Create Member Account
+        </button>
+      </form>
+
+      <div class="p-4 bg-slate-50 border-t border-slate-100 text-center text-xs text-slate-500">
+        Alexandria Library System • Multi-user Authentication
       </div>
-      <span class="font-bold text-white text-base">Alexandria</span>
     </div>
-    <div class="flex items-center gap-2">
-      <button onclick="toggleMobileMenu()" class="p-2 text-slate-400 hover:text-white">
-        <i class="fa-solid fa-bars text-lg"></i>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MAIN APPLICATION (SHOWN AFTER LOGGED IN) -->
+  <!-- ======================================================== -->
+  <div id="main-app" class="hidden min-h-screen flex">
+
+    <!-- Sidebar Navigation -->
+    <aside class="w-64 bg-slate-900 text-slate-200 flex-shrink-0 hidden md:flex flex-col justify-between border-r border-slate-800 z-20">
+      <div>
+        <!-- Brand Logo / Details -->
+        <div class="h-20 flex items-center px-6 gap-3 border-b border-slate-800/80 bg-slate-950/40">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-600 to-amber-400 flex items-center justify-center text-white shadow-lg shadow-amber-500/20">
+            <i class="fa-solid fa-book-bookmark text-lg"></i>
+          </div>
+          <div>
+            <h1 class="font-bold text-lg text-white tracking-tight flex items-center gap-1.5">
+              Alexandria <span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-normal">v2.5</span>
+            </h1>
+            <p class="text-xs text-slate-400" id="sidebar-lib-name">Central City Library</p>
+          </div>
+        </div>
+
+        <!-- Navigation Links -->
+        <nav class="p-4 space-y-1.5 text-sm font-medium">
+          <button onclick="switchView('dashboard')" id="nav-dashboard" class="nav-btn w-full flex items-center gap-3.5 px-4 py-3 rounded-xl transition text-white bg-slate-800 shadow-sm">
+            <i class="fa-solid fa-chart-pie w-5 text-amber-400"></i>
+            <span>Dashboard</span>
+          </button>
+          
+          <button onclick="switchView('books')" id="nav-books" class="nav-btn w-full flex items-center justify-between px-4 py-3 rounded-xl transition text-slate-400 hover:text-white hover:bg-slate-800/50">
+            <div class="flex items-center gap-3.5">
+              <i class="fa-solid fa-book-open w-5 text-indigo-400"></i>
+              <span id="nav-books-label">Books Catalog</span>
+            </div>
+            <span id="badge-total-books" class="text-xs bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full">0</span>
+          </button>
+
+          <!-- Admin Only: Members Directory -->
+          <button onclick="switchView('members')" id="nav-members" class="nav-btn admin-only w-full flex items-center justify-between px-4 py-3 rounded-xl transition text-slate-400 hover:text-white hover:bg-slate-800/50">
+            <div class="flex items-center gap-3.5">
+              <i class="fa-solid fa-users w-5 text-emerald-400"></i>
+              <span>Members (Logins)</span>
+            </div>
+            <span id="badge-total-members" class="text-xs bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full">0</span>
+          </button>
+
+          <!-- Circulation: Shown to Admin and Members (labeled accordingly) -->
+          <button onclick="switchView('circulation')" id="nav-circulation" class="nav-btn w-full flex items-center justify-between px-4 py-3 rounded-xl transition text-slate-400 hover:text-white hover:bg-slate-800/50">
+            <div class="flex items-center gap-3.5">
+              <i class="fa-solid fa-arrow-right-arrow-left w-5 text-cyan-400"></i>
+              <span id="nav-circulation-label">Circulation / Loans</span>
+            </div>
+            <span id="badge-active-loans" class="text-xs bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full">0</span>
+          </button>
+
+          <!-- Admin Only: Library Profile -->
+          <button onclick="switchView('library-info')" id="nav-library-info" class="nav-btn admin-only w-full flex items-center gap-3.5 px-4 py-3 rounded-xl transition text-slate-400 hover:text-white hover:bg-slate-800/50">
+            <i class="fa-solid fa-building-columns w-5 text-rose-400"></i>
+            <span>Library Profile</span>
+          </button>
+        </nav>
+      </div>
+
+      <!-- Current User Profile Box & Logout -->
+      <div class="p-4 m-3 rounded-xl bg-slate-800/70 border border-slate-700/60 text-xs text-slate-300 space-y-3">
+        <div class="flex items-center gap-2.5">
+          <div id="sidebar-user-avatar" class="w-9 h-9 rounded-full bg-amber-500/20 text-amber-300 flex items-center justify-center font-bold text-sm">
+            <i class="fa-solid fa-user-shield"></i>
+          </div>
+          <div class="overflow-hidden">
+            <p class="font-bold text-white truncate" id="sidebar-user-name">Dr. Eleanor Vance</p>
+            <p class="text-[11px] text-amber-400 font-medium" id="sidebar-user-role">Administrator</p>
+          </div>
+        </div>
+
+        <button onclick="handleLogout()" class="w-full py-2 bg-slate-900 hover:bg-rose-900/60 hover:text-rose-200 text-slate-300 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 border border-slate-700 transition">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign Out
+        </button>
+      </div>
+    </aside>
+
+    <!-- Mobile Top Navigation Bar -->
+    <div class="md:hidden fixed top-0 left-0 right-0 h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-4 z-40">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center text-white font-bold">
+          <i class="fa-solid fa-book-bookmark"></i>
+        </div>
+        <span class="font-bold text-white text-base">Alexandria</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="handleLogout()" class="px-2.5 py-1 bg-slate-800 text-slate-300 text-xs rounded-lg">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i>
+        </button>
+        <button onclick="toggleMobileMenu()" class="p-2 text-slate-400 hover:text-white">
+          <i class="fa-solid fa-bars text-lg"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile Dropdown Menu -->
+    <div id="mobile-menu" class="hidden md:hidden fixed inset-x-0 top-16 bg-slate-900 border-b border-slate-800 p-4 space-y-2 z-40 text-sm">
+      <button onclick="switchView('dashboard'); toggleMobileMenu()" class="w-full text-left p-2.5 text-white hover:bg-slate-800 rounded-lg flex items-center gap-3">
+        <i class="fa-solid fa-chart-pie w-5 text-amber-400"></i> Dashboard
+      </button>
+      <button onclick="switchView('books'); toggleMobileMenu()" class="w-full text-left p-2.5 text-slate-300 hover:bg-slate-800 rounded-lg flex items-center gap-3">
+        <i class="fa-solid fa-book-open w-5 text-indigo-400"></i> Books Catalog
+      </button>
+      <button onclick="switchView('members'); toggleMobileMenu()" class="admin-only w-full text-left p-2.5 text-slate-300 hover:bg-slate-800 rounded-lg flex items-center gap-3">
+        <i class="fa-solid fa-users w-5 text-emerald-400"></i> Members (Logins)
+      </button>
+      <button onclick="switchView('circulation'); toggleMobileMenu()" class="w-full text-left p-2.5 text-slate-300 hover:bg-slate-800 rounded-lg flex items-center gap-3">
+        <i class="fa-solid fa-arrow-right-arrow-left w-5 text-cyan-400"></i> Circulation
+      </button>
+      <button onclick="switchView('library-info'); toggleMobileMenu()" class="admin-only w-full text-left p-2.5 text-slate-300 hover:bg-slate-800 rounded-lg flex items-center gap-3">
+        <i class="fa-solid fa-building-columns w-5 text-rose-400"></i> Library Profile
       </button>
     </div>
-  </div>
 
-  <!-- Mobile Dropdown Menu -->
-  <div id="mobile-menu" class="hidden md:hidden fixed inset-x-0 top-16 bg-slate-900 border-b border-slate-800 p-4 space-y-2 z-40 text-sm">
-    <button onclick="switchView('dashboard'); toggleMobileMenu()" class="w-full text-left p-2.5 text-white hover:bg-slate-800 rounded-lg flex items-center gap-3">
-      <i class="fa-solid fa-chart-pie w-5 text-amber-400"></i> Dashboard
-    </button>
-    <button onclick="switchView('books'); toggleMobileMenu()" class="w-full text-left p-2.5 text-slate-300 hover:bg-slate-800 rounded-lg flex items-center gap-3">
-      <i class="fa-solid fa-book-open w-5 text-indigo-400"></i> Books Catalog
-    </button>
-    <button onclick="switchView('members'); toggleMobileMenu()" class="w-full text-left p-2.5 text-slate-300 hover:bg-slate-800 rounded-lg flex items-center gap-3">
-      <i class="fa-solid fa-users w-5 text-emerald-400"></i> Members
-    </button>
-    <button onclick="switchView('circulation'); toggleMobileMenu()" class="w-full text-left p-2.5 text-slate-300 hover:bg-slate-800 rounded-lg flex items-center gap-3">
-      <i class="fa-solid fa-arrow-right-arrow-left w-5 text-cyan-400"></i> Circulation
-    </button>
-    <button onclick="switchView('library-info'); toggleMobileMenu()" class="w-full text-left p-2.5 text-slate-300 hover:bg-slate-800 rounded-lg flex items-center gap-3">
-      <i class="fa-solid fa-building-columns w-5 text-rose-400"></i> Library Profile
-    </button>
-  </div>
+    <!-- Main Content Area -->
+    <div class="flex-1 flex flex-col min-h-screen overflow-x-hidden md:pt-0 pt-16">
+      
+      <!-- Top Header -->
+      <header class="h-20 bg-white border-b border-slate-200/80 px-6 sm:px-8 flex items-center justify-between gap-4 sticky top-0 z-10 shadow-xs">
+        <div>
+          <h2 id="page-title" class="text-xl font-bold text-slate-900 tracking-tight">System Dashboard</h2>
+          <p id="page-subtitle" class="text-xs text-slate-500">Welcome to Alexandria Library Portal & Information System</p>
+        </div>
 
-  <!-- Main Content Wrapper -->
-  <div class="flex-1 flex flex-col min-h-screen overflow-x-hidden md:pt-0 pt-16">
-    
-    <!-- Top Header -->
-    <header class="h-20 bg-white border-b border-slate-200/80 px-6 sm:px-8 flex items-center justify-between gap-4 sticky top-0 z-10 shadow-xs">
-      <div>
-        <h2 id="page-title" class="text-xl font-bold text-slate-900 tracking-tight">System Dashboard</h2>
-        <p id="page-subtitle" class="text-xs text-slate-500">Welcome to Alexandria Library Portal & Information System</p>
-      </div>
+        <!-- Header Actions: Admin vs Member -->
+        <div class="flex items-center gap-2.5">
+          <!-- Admin Actions -->
+          <div id="header-admin-actions" class="admin-only flex items-center gap-2.5">
+            <button onclick="openModal('modal-add-book')" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold shadow-sm transition hover:shadow-indigo-500/20 active:scale-95">
+              <i class="fa-solid fa-plus"></i>
+              <span>Add Book</span>
+            </button>
+            <button onclick="openModal('modal-add-member')" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold shadow-sm transition hover:shadow-emerald-500/20 active:scale-95">
+              <i class="fa-solid fa-user-plus"></i>
+              <span>Add Member</span>
+            </button>
+            <button onclick="openModal('modal-issue-book')" class="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold shadow-sm transition active:scale-95">
+              <i class="fa-solid fa-arrow-right-arrow-left text-amber-400"></i>
+              <span class="hidden sm:inline">Issue Book</span>
+            </button>
+          </div>
 
-      <!-- Quick Action Buttons -->
-      <div class="flex items-center gap-2.5">
-        <button onclick="openModal('modal-add-book')" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold shadow-sm transition hover:shadow-indigo-500/20 active:scale-95">
-          <i class="fa-solid fa-plus"></i>
-          <span>Add Book</span>
-        </button>
-        <button onclick="openModal('modal-add-member')" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold shadow-sm transition hover:shadow-emerald-500/20 active:scale-95">
-          <i class="fa-solid fa-user-plus"></i>
-          <span>Add Member</span>
-        </button>
-        <button onclick="openModal('modal-issue-book')" class="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold shadow-sm transition active:scale-95">
-          <i class="fa-solid fa-arrow-right-arrow-left text-amber-400"></i>
-          <span class="hidden sm:inline">Issue Book</span>
-        </button>
-      </div>
-    </header>
-
-    <!-- Content Body Views -->
-    <main class="flex-1 p-6 sm:p-8 max-w-7xl w-full mx-auto space-y-8">
-
-      <!-- ========================================== -->
-      <!-- VIEW 1: DASHBOARD -->
-      <!-- ========================================== -->
-      <section id="view-dashboard" class="space-y-8">
-        <!-- Welcome Hero Banner -->
-        <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-6 sm:p-8 shadow-xl relative overflow-hidden border border-slate-800">
-          <div class="relative z-10 max-w-2xl space-y-2">
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-semibold uppercase tracking-wider">
-              <i class="fa-solid fa-landmark"></i> Official Library Management Portal
+          <!-- User Profile Tag / Logout -->
+          <div class="flex items-center gap-2 border-l border-slate-200 pl-3 ml-1">
+            <span id="top-user-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-800">
+              Admin
             </span>
-            <h2 class="text-2xl sm:text-3xl font-bold font-serif tracking-tight text-white" id="dash-lib-heading">The Alexandria Athenaeum</h2>
-            <p class="text-slate-300 text-sm leading-relaxed" id="dash-lib-tagline">
-              Manage physical & digital archives, catalog new volumes with custom cover imagery, supervise student and scholar memberships, and control circulation seamlessly.
-            </p>
-            <div class="pt-3 flex flex-wrap gap-4 text-xs text-slate-300">
-              <span class="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-lg backdrop-blur-sm">
-                <i class="fa-regular fa-clock text-amber-400"></i> Hours: <strong id="dash-hours" class="text-white">8:00 AM - 9:00 PM</strong>
-              </span>
-              <span class="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-lg backdrop-blur-sm">
-                <i class="fa-solid fa-phone text-indigo-300"></i> Support: <strong id="dash-phone" class="text-white">+1 (555) 234-8900</strong>
-              </span>
-            </div>
-          </div>
-          <!-- Decorative Background Elements -->
-          <div class="absolute -right-8 -bottom-10 opacity-10 text-slate-100 text-9xl pointer-events-none">
-            <i class="fa-solid fa-book-atlas"></i>
+            <button onclick="handleLogout()" title="Log Out" class="p-2 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 transition">
+              <i class="fa-solid fa-arrow-right-from-bracket"></i>
+            </button>
           </div>
         </div>
+      </header>
 
-        <!-- Metric KPI Cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          <!-- Card 1: Books -->
-          <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
-            <div class="space-y-1">
-              <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Catalog Volume</span>
-              <h3 class="text-3xl font-extrabold text-slate-900" id="dash-kpi-books">0</h3>
-              <p class="text-xs text-slate-500 flex items-center gap-1.5">
-                <span class="text-emerald-600 font-semibold" id="dash-kpi-available">0 Available</span>
+      <!-- Content Views Container -->
+      <main class="flex-1 p-6 sm:p-8 max-w-7xl w-full mx-auto space-y-8">
+
+        <!-- ========================================== -->
+        <!-- VIEW 1: DASHBOARD -->
+        <!-- ========================================== -->
+        <section id="view-dashboard" class="space-y-8">
+          <!-- Welcome Hero Banner -->
+          <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-6 sm:p-8 shadow-xl relative overflow-hidden border border-slate-800">
+            <div class="relative z-10 max-w-2xl space-y-2">
+              <span id="dash-role-badge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-semibold uppercase tracking-wider">
+                <i class="fa-solid fa-user-shield"></i> Administrator Dashboard
+              </span>
+              <h2 class="text-2xl sm:text-3xl font-bold font-serif tracking-tight text-white" id="dash-greeting">Welcome to The Alexandria Athenaeum</h2>
+              <p class="text-slate-300 text-sm leading-relaxed" id="dash-lib-tagline">
+                Manage physical & digital archives, catalog new volumes with custom cover imagery, supervise student and scholar memberships, and control circulation seamlessly.
               </p>
-            </div>
-            <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl">
-              <i class="fa-solid fa-book"></i>
-            </div>
-          </div>
-
-          <!-- Card 2: Members -->
-          <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
-            <div class="space-y-1">
-              <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Registered Members</span>
-              <h3 class="text-3xl font-extrabold text-slate-900" id="dash-kpi-members">0</h3>
-              <p class="text-xs text-slate-500">
-                <span class="text-emerald-600 font-semibold" id="dash-kpi-active-members">0 Active</span> accounts
-              </p>
-            </div>
-            <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl">
-              <i class="fa-solid fa-id-card"></i>
-            </div>
-          </div>
-
-          <!-- Card 3: Currently Issued -->
-          <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
-            <div class="space-y-1">
-              <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Books Checked Out</span>
-              <h3 class="text-3xl font-extrabold text-slate-900" id="dash-kpi-issued">0</h3>
-              <p class="text-xs text-slate-500">Active borrower loans</p>
-            </div>
-            <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl">
-              <i class="fa-solid fa-arrow-right-arrow-left"></i>
-            </div>
-          </div>
-
-          <!-- Card 4: Categories -->
-          <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
-            <div class="space-y-1">
-              <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Subject Categories</span>
-              <h3 class="text-3xl font-extrabold text-slate-900" id="dash-kpi-categories">0</h3>
-              <p class="text-xs text-slate-500">Curated collections</p>
-            </div>
-            <div class="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-xl">
-              <i class="fa-solid fa-shapes"></i>
-            </div>
-          </div>
-        </div>
-
-        <!-- Dashboard Grid: Featured Books + Recent Loans + Quick Actions -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <!-- Left Column (2 spans): Recently Added Books -->
-          <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 p-6 space-y-5">
-            <div class="flex items-center justify-between">
-              <div>
-                <h4 class="font-bold text-slate-900 text-base">Recently Added Volumes</h4>
-                <p class="text-xs text-slate-500">Latest titles in the library collection</p>
+              <div class="pt-3 flex flex-wrap gap-4 text-xs text-slate-300">
+                <span class="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-lg backdrop-blur-sm">
+                  <i class="fa-regular fa-clock text-amber-400"></i> Hours: <strong id="dash-hours" class="text-white">8:00 AM - 9:00 PM</strong>
+                </span>
+                <span class="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-lg backdrop-blur-sm">
+                  <i class="fa-solid fa-phone text-indigo-300"></i> Support: <strong id="dash-phone" class="text-white">+1 (555) 234-8900</strong>
+                </span>
               </div>
-              <button onclick="switchView('books')" class="text-xs text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1">
-                View All <i class="fa-solid fa-arrow-right text-[10px]"></i>
-              </button>
             </div>
-            <div id="dash-recent-books" class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <!-- Rendered via JS -->
+            <div class="absolute -right-8 -bottom-10 opacity-10 text-slate-100 text-9xl pointer-events-none">
+              <i class="fa-solid fa-book-atlas"></i>
             </div>
           </div>
 
-          <!-- Right Column: Recent Activity & Quick Controls -->
-          <div class="space-y-6">
-            <!-- Active Loans mini table -->
-            <div class="bg-white rounded-2xl border border-slate-200/80 p-6 space-y-4">
+          <!-- Metric KPI Cards -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+              <div class="space-y-1">
+                <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Catalog Volume</span>
+                <h3 class="text-3xl font-extrabold text-slate-900" id="dash-kpi-books">0</h3>
+                <p class="text-xs text-slate-500" id="dash-kpi-available">0 Available</p>
+              </div>
+              <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-book"></i>
+              </div>
+            </div>
+
+            <!-- Card 2: Changes depending on Admin vs Member -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+              <div class="space-y-1">
+                <span class="text-xs font-semibold uppercase tracking-wider text-slate-400" id="dash-kpi2-title">Registered Members</span>
+                <h3 class="text-3xl font-extrabold text-slate-900" id="dash-kpi-members">0</h3>
+                <p class="text-xs text-slate-500" id="dash-kpi2-desc">Active accounts</p>
+              </div>
+              <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-id-card"></i>
+              </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+              <div class="space-y-1">
+                <span class="text-xs font-semibold uppercase tracking-wider text-slate-400" id="dash-kpi3-title">Books Checked Out</span>
+                <h3 class="text-3xl font-extrabold text-slate-900" id="dash-kpi-issued">0</h3>
+                <p class="text-xs text-slate-500" id="dash-kpi3-desc">Active loans</p>
+              </div>
+              <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-arrow-right-arrow-left"></i>
+              </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+              <div class="space-y-1">
+                <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Subject Categories</span>
+                <h3 class="text-3xl font-extrabold text-slate-900" id="dash-kpi-categories">0</h3>
+                <p class="text-xs text-slate-500">Curated collections</p>
+              </div>
+              <div class="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-xl">
+                <i class="fa-solid fa-shapes"></i>
+              </div>
+            </div>
+          </div>
+
+          <!-- Featured Books + Loans Section -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 p-6 space-y-5">
               <div class="flex items-center justify-between">
-                <h4 class="font-bold text-slate-900 text-base">Active Loans</h4>
-                <button onclick="switchView('circulation')" class="text-xs text-indigo-600 hover:text-indigo-800 font-semibold">Circulation</button>
+                <div>
+                  <h4 class="font-bold text-slate-900 text-base">Recently Added Volumes</h4>
+                  <p class="text-xs text-slate-500">Explore the latest titles in the library collection</p>
+                </div>
+                <button onclick="switchView('books')" class="text-xs text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1">
+                  Browse Catalog <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                </button>
               </div>
-              <div id="dash-active-loans" class="space-y-3">
-                <!-- Rendered dynamically -->
+              <div id="dash-recent-books" class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <!-- Rendered via JS -->
               </div>
             </div>
 
-            <!-- Activity Log -->
-            <div class="bg-white rounded-2xl border border-slate-200/80 p-6 space-y-3">
-              <h4 class="font-bold text-slate-900 text-base">System Audit Trail</h4>
-              <ul id="dash-activity-log" class="text-xs space-y-3 text-slate-600">
-                <!-- Activity items -->
-              </ul>
+            <div class="space-y-6">
+              <!-- Active Loans Box -->
+              <div class="bg-white rounded-2xl border border-slate-200/80 p-6 space-y-4">
+                <div class="flex items-center justify-between">
+                  <h4 class="font-bold text-slate-900 text-base" id="dash-loans-heading">Active Loans</h4>
+                  <button onclick="switchView('circulation')" class="text-xs text-indigo-600 hover:text-indigo-800 font-semibold">View All</button>
+                </div>
+                <div id="dash-active-loans" class="space-y-3">
+                  <!-- Rendered dynamically -->
+                </div>
+              </div>
+
+              <!-- Activity Log (Admin only or General) -->
+              <div class="bg-white rounded-2xl border border-slate-200/80 p-6 space-y-3">
+                <h4 class="font-bold text-slate-900 text-base">Activity Highlights</h4>
+                <ul id="dash-activity-log" class="text-xs space-y-3 text-slate-600">
+                  <!-- Activity items -->
+                </ul>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <!-- ========================================== -->
-      <!-- VIEW 2: BOOKS CATALOG -->
-      <!-- ========================================== -->
-      <section id="view-books" class="hidden space-y-6">
-        <!-- Filter and Search Bar -->
-        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
-          <div class="flex flex-col sm:flex-row gap-4 items-center justify-between">
-            <!-- Search Input -->
+        <!-- ========================================== -->
+        <!-- VIEW 2: BOOKS CATALOG -->
+        <!-- ========================================== -->
+        <section id="view-books" class="hidden space-y-6">
+          <!-- Filter and Search Bar -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
+            <div class="flex flex-col sm:flex-row gap-4 items-center justify-between">
+              <!-- Search Input -->
+              <div class="relative w-full sm:w-96">
+                <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                <input type="text" id="book-search-input" oninput="filterBooks()" placeholder="Search by title, author, or ISBN..." 
+                       class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition">
+              </div>
+
+              <!-- Right Controls -->
+              <div class="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end">
+                <select id="book-category-filter" onchange="filterBooks()" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium text-slate-700 focus:outline-none focus:border-indigo-500">
+                  <option value="ALL">All Categories</option>
+                </select>
+
+                <select id="book-status-filter" onchange="filterBooks()" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium text-slate-700 focus:outline-none focus:border-indigo-500">
+                  <option value="ALL">All Status</option>
+                  <option value="AVAILABLE">Available</option>
+                  <option value="UNAVAILABLE">Checked Out / None</option>
+                </select>
+
+                <!-- Grid vs Table -->
+                <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+                  <button onclick="setBookView('grid')" id="btn-book-view-grid" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white text-indigo-700 shadow-xs transition">
+                    <i class="fa-solid fa-grip"></i>
+                  </button>
+                  <button onclick="setBookView('table')" id="btn-book-view-table" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 transition">
+                    <i class="fa-solid fa-list"></i>
+                  </button>
+                </div>
+
+                <!-- Admin Only Add Book Button -->
+                <button onclick="openModal('modal-add-book')" class="admin-only bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition">
+                  <i class="fa-solid fa-plus"></i> Add Book
+                </button>
+              </div>
+            </div>
+
+            <!-- Showing Count -->
+            <div class="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
+              <span>Showing <strong id="books-showing-count" class="text-slate-800">0</strong> cataloged volumes</span>
+              <span class="text-slate-400">Click any book card to inspect metadata, cover image, or borrow</span>
+            </div>
+          </div>
+
+          <!-- Books Grid Container -->
+          <div id="books-grid-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div>
+
+          <!-- Books Table Container -->
+          <div id="books-table-container" class="hidden bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-xs">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm text-slate-600">
+                <thead class="bg-slate-50 border-b border-slate-200 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th class="py-3.5 px-4">Book Details</th>
+                    <th class="py-3.5 px-4">Category</th>
+                    <th class="py-3.5 px-4">ISBN</th>
+                    <th class="py-3.5 px-4">Copies</th>
+                    <th class="py-3.5 px-4">Status</th>
+                    <th class="py-3.5 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="books-table-body" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Empty state -->
+          <div id="books-empty-state" class="hidden py-16 text-center space-y-3 bg-white rounded-2xl border border-dashed border-slate-300">
+            <div class="w-14 h-14 mx-auto rounded-full bg-slate-100 text-slate-400 flex items-center justify-center text-2xl">
+              <i class="fa-solid fa-book-open"></i>
+            </div>
+            <h4 class="font-bold text-slate-700">No books found</h4>
+            <p class="text-xs text-slate-500 max-w-sm mx-auto">Try adjusting your search criteria.</p>
+          </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- VIEW 3: MEMBERS DIRECTORY (ADMIN ONLY) -->
+        <!-- ========================================== -->
+        <section id="view-members" class="admin-only hidden space-y-6">
+          <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row gap-4 items-center justify-between">
             <div class="relative w-full sm:w-96">
               <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-              <input type="text" id="book-search-input" oninput="filterBooks()" placeholder="Search by title, author, or ISBN..." 
-                     class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition">
+              <input type="text" id="member-search-input" oninput="filterMembers()" placeholder="Search by name, ID, or login username..." 
+                     class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition">
             </div>
 
-            <!-- Right Controls: Category Filter, Status Filter, View Toggle, Add Book -->
-            <div class="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end">
-              <select id="book-category-filter" onchange="filterBooks()" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium text-slate-700 focus:outline-none focus:border-indigo-500">
-                <option value="ALL">All Categories</option>
-                <!-- Filled dynamically -->
+            <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
+              <select id="member-tier-filter" onchange="filterMembers()" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium text-slate-700 focus:outline-none focus:border-emerald-500">
+                <option value="ALL">All Membership Tiers</option>
+                <option value="Standard">Standard</option>
+                <option value="Student">Student</option>
+                <option value="Premium">Premium / Scholar</option>
+                <option value="Faculty">Faculty & Staff</option>
               </select>
 
-              <select id="book-status-filter" onchange="filterBooks()" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium text-slate-700 focus:outline-none focus:border-indigo-500">
-                <option value="ALL">All Status</option>
-                <option value="AVAILABLE">Available</option>
-                <option value="UNAVAILABLE">Checked Out / None</option>
-              </select>
-
-              <!-- View Mode Toggle: Grid vs Table -->
-              <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
-                <button onclick="setBookView('grid')" id="btn-book-view-grid" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white text-indigo-700 shadow-xs transition">
-                  <i class="fa-solid fa-grip"></i>
-                </button>
-                <button onclick="setBookView('table')" id="btn-book-view-table" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 transition">
-                  <i class="fa-solid fa-list"></i>
-                </button>
-              </div>
-
-              <button onclick="openModal('modal-add-book')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition">
-                <i class="fa-solid fa-plus"></i> Add Book
+              <button onclick="openModal('modal-add-member')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition">
+                <i class="fa-solid fa-user-plus"></i> Add Member
               </button>
             </div>
           </div>
 
-          <!-- Total Count Display -->
-          <div class="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100">
-            <span>Showing <strong id="books-showing-count" class="text-slate-800">0</strong> cataloged books</span>
-            <span class="text-slate-400">Click any card or table row to view full metadata or manage copies</span>
-          </div>
-        </div>
-
-        <!-- Books Grid Container -->
-        <div id="books-grid-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          <!-- Rendered by JS -->
-        </div>
-
-        <!-- Books Table Container -->
-        <div id="books-table-container" class="hidden bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-xs">
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm text-slate-600">
-              <thead class="bg-slate-50 border-b border-slate-200 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                <tr>
-                  <th class="py-3.5 px-4">Book Details</th>
-                  <th class="py-3.5 px-4">Category</th>
-                  <th class="py-3.5 px-4">ISBN</th>
-                  <th class="py-3.5 px-4">Copies</th>
-                  <th class="py-3.5 px-4">Status</th>
-                  <th class="py-3.5 px-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody id="books-table-body" class="divide-y divide-slate-100">
-                <!-- Rendered by JS -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Empty state -->
-        <div id="books-empty-state" class="hidden py-16 text-center space-y-3 bg-white rounded-2xl border border-dashed border-slate-300">
-          <div class="w-14 h-14 mx-auto rounded-full bg-slate-100 text-slate-400 flex items-center justify-center text-2xl">
-            <i class="fa-solid fa-book-open"></i>
-          </div>
-          <h4 class="font-bold text-slate-700">No books found</h4>
-          <p class="text-xs text-slate-500 max-w-sm mx-auto">Try adjusting your search criteria or add a new book to the library collection.</p>
-          <button onclick="openModal('modal-add-book')" class="inline-flex items-center gap-2 text-indigo-600 hover:text-indigo-800 font-semibold text-xs mt-2">
-            <i class="fa-solid fa-plus"></i> Add New Book
-          </button>
-        </div>
-      </section>
-
-      <!-- ========================================== -->
-      <!-- VIEW 3: MEMBERS DIRECTORY -->
-      <!-- ========================================== -->
-      <section id="view-members" class="hidden space-y-6">
-        <!-- Member Controls -->
-        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row gap-4 items-center justify-between">
-          <div class="relative w-full sm:w-96">
-            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-            <input type="text" id="member-search-input" oninput="filterMembers()" placeholder="Search members by name, email, or ID..." 
-                   class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition">
+          <!-- Members Table with Login Credentials Management -->
+          <div class="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-xs">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm text-slate-600">
+                <thead class="bg-slate-50 border-b border-slate-200 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th class="py-3.5 px-4">Member Info</th>
+                    <th class="py-3.5 px-4">Member ID</th>
+                    <th class="py-3.5 px-4 bg-amber-50/70 text-amber-900 border-x border-amber-200/60">
+                      <i class="fa-solid fa-key mr-1 text-amber-600"></i> Login Username & Password (Admin Manage)
+                    </th>
+                    <th class="py-3.5 px-4">Tier / Category</th>
+                    <th class="py-3.5 px-4">Contact</th>
+                    <th class="py-3.5 px-4">Status</th>
+                    <th class="py-3.5 px-4">Loans</th>
+                    <th class="py-3.5 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="members-table-body" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
           </div>
 
-          <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
-            <select id="member-tier-filter" onchange="filterMembers()" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium text-slate-700 focus:outline-none focus:border-emerald-500">
-              <option value="ALL">All Membership Tiers</option>
-              <option value="Standard">Standard</option>
-              <option value="Student">Student</option>
-              <option value="Premium">Premium / Scholar</option>
-              <option value="Faculty">Faculty & Staff</option>
-            </select>
-
-            <button onclick="openModal('modal-add-member')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 transition">
-              <i class="fa-solid fa-user-plus"></i> Add Member
-            </button>
+          <div id="members-empty-state" class="hidden py-16 text-center space-y-3 bg-white rounded-2xl border border-dashed border-slate-300">
+            <div class="w-14 h-14 mx-auto rounded-full bg-slate-100 text-slate-400 flex items-center justify-center text-2xl">
+              <i class="fa-solid fa-users"></i>
+            </div>
+            <h4 class="font-bold text-slate-700">No members found</h4>
           </div>
-        </div>
+        </section>
 
-        <!-- Members Table -->
-        <div class="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-xs">
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm text-slate-600">
-              <thead class="bg-slate-50 border-b border-slate-200 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                <tr>
-                  <th class="py-3.5 px-4">Member Info</th>
-                  <th class="py-3.5 px-4">Member ID</th>
-                  <th class="py-3.5 px-4">Tier / Category</th>
-                  <th class="py-3.5 px-4">Contact</th>
-                  <th class="py-3.5 px-4">Status</th>
-                  <th class="py-3.5 px-4">Active Loans</th>
-                  <th class="py-3.5 px-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody id="members-table-body" class="divide-y divide-slate-100">
-                <!-- Rendered by JS -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Empty Members State -->
-        <div id="members-empty-state" class="hidden py-16 text-center space-y-3 bg-white rounded-2xl border border-dashed border-slate-300">
-          <div class="w-14 h-14 mx-auto rounded-full bg-slate-100 text-slate-400 flex items-center justify-center text-2xl">
-            <i class="fa-solid fa-users"></i>
-          </div>
-          <h4 class="font-bold text-slate-700">No members found</h4>
-          <p class="text-xs text-slate-500 max-w-sm mx-auto">Enroll a reader or scholar into Alexandria library records.</p>
-          <button onclick="openModal('modal-add-member')" class="inline-flex items-center gap-2 text-emerald-600 hover:text-emerald-800 font-semibold text-xs mt-2">
-            <i class="fa-solid fa-user-plus"></i> Enroll Member
-          </button>
-        </div>
-      </section>
-
-      <!-- ========================================== -->
-      <!-- VIEW 4: CIRCULATION (BORROW & RETURN) -->
-      <!-- ========================================== -->
-      <section id="view-circulation" class="hidden space-y-6">
-        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
-          <div>
-            <h3 class="text-base font-bold text-slate-900">Circulation Desk & Loans Registry</h3>
-            <p class="text-xs text-slate-500">Track checkouts, return borrowed volumes, and manage due dates</p>
-          </div>
-          <button onclick="openModal('modal-issue-book')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 shadow-xs transition">
-            <i class="fa-solid fa-arrow-right-arrow-left"></i> Issue Book to Member
-          </button>
-        </div>
-
-        <!-- Loans Table -->
-        <div class="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-xs">
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm text-slate-600">
-              <thead class="bg-slate-50 border-b border-slate-200 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                <tr>
-                  <th class="py-3.5 px-4">Loan ID</th>
-                  <th class="py-3.5 px-4">Book Title</th>
-                  <th class="py-3.5 px-4">Member</th>
-                  <th class="py-3.5 px-4">Borrow Date</th>
-                  <th class="py-3.5 px-4">Due Date</th>
-                  <th class="py-3.5 px-4">Loan Status</th>
-                  <th class="py-3.5 px-4 text-right">Circulation Action</th>
-                </tr>
-              </thead>
-              <tbody id="loans-table-body" class="divide-y divide-slate-100">
-                <!-- Rendered by JS -->
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div id="loans-empty-state" class="hidden py-16 text-center space-y-3 bg-white rounded-2xl border border-dashed border-slate-300">
-          <div class="w-14 h-14 mx-auto rounded-full bg-slate-100 text-slate-400 flex items-center justify-center text-2xl">
-            <i class="fa-solid fa-circle-check text-emerald-500"></i>
-          </div>
-          <h4 class="font-bold text-slate-700">All books are accounted for in the library!</h4>
-          <p class="text-xs text-slate-500">There are currently no outstanding book loans recorded.</p>
-        </div>
-      </section>
-
-      <!-- ========================================== -->
-      <!-- VIEW 5: LIBRARY PROFILE & DETAILS -->
-      <!-- ========================================== -->
-      <section id="view-library-info" class="hidden space-y-8">
-        <!-- Organization Details Card -->
-        <div class="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-8 space-y-6 shadow-xs">
-          <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+        <!-- ========================================== -->
+        <!-- VIEW 4: CIRCULATION (BORROW & RETURN) -->
+        <!-- ========================================== -->
+        <section id="view-circulation" class="hidden space-y-6">
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
             <div>
-              <h3 class="text-lg font-bold text-slate-900">Library Institutional Profile</h3>
-              <p class="text-xs text-slate-500">Official information, operating schedule, and branch contact details</p>
+              <h3 class="text-base font-bold text-slate-900" id="circ-heading">Circulation Desk & Loans Registry</h3>
+              <p class="text-xs text-slate-500" id="circ-desc">Track checkouts, return borrowed volumes, and manage due dates</p>
             </div>
-            <button onclick="openModal('modal-edit-library')" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition">
-              <i class="fa-solid fa-pen-to-square"></i> Edit Profile
+            <button onclick="openModal('modal-issue-book')" id="circ-issue-btn" class="admin-only bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 shadow-xs transition">
+              <i class="fa-solid fa-arrow-right-arrow-left"></i> Issue Book to Member
             </button>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-sm">
-            <div class="space-y-1">
-              <span class="text-xs text-slate-400 font-medium">Institution Name</span>
-              <p class="font-semibold text-slate-800" id="info-name">Alexandria Athenaeum Central Library</p>
-            </div>
-            <div class="space-y-1">
-              <span class="text-xs text-slate-400 font-medium">Head Curator / Chief Librarian</span>
-              <p class="font-semibold text-slate-800" id="info-librarian">Dr. Eleanor Vance, Ph.D. in Library Sciences</p>
-            </div>
-            <div class="space-y-1">
-              <span class="text-xs text-slate-400 font-medium">Operating Hours</span>
-              <p class="font-semibold text-slate-800" id="info-hours">Mon - Sat: 8:00 AM – 9:00 PM | Sun: 10:00 AM – 6:00 PM</p>
-            </div>
-            <div class="space-y-1">
-              <span class="text-xs text-slate-400 font-medium">Official Address</span>
-              <p class="font-semibold text-slate-800" id="info-address">450 University Boulevard, Academic Quarter, Suite 101</p>
-            </div>
-            <div class="space-y-1">
-              <span class="text-xs text-slate-400 font-medium">Contact Telephone</span>
-              <p class="font-semibold text-slate-800" id="info-phone">+1 (555) 234-8900</p>
-            </div>
-            <div class="space-y-1">
-              <span class="text-xs text-slate-400 font-medium">Inquiry Email</span>
-              <p class="font-semibold text-slate-800" id="info-email">curator@alexandrialibrary.org</p>
+          <!-- Loans Table -->
+          <div class="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-xs">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm text-slate-600">
+                <thead class="bg-slate-50 border-b border-slate-200 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th class="py-3.5 px-4">Loan ID</th>
+                    <th class="py-3.5 px-4">Book Title</th>
+                    <th class="py-3.5 px-4">Borrower</th>
+                    <th class="py-3.5 px-4">Borrow Date</th>
+                    <th class="py-3.5 px-4">Due Date</th>
+                    <th class="py-3.5 px-4">Loan Status</th>
+                    <th class="py-3.5 px-4 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="loans-table-body" class="divide-y divide-slate-100"></tbody>
+              </table>
             </div>
           </div>
 
-          <!-- Policies and Guidelines -->
-          <div class="pt-6 border-t border-slate-100">
-            <h4 class="font-bold text-slate-900 text-sm mb-3">Borrowing Rules & Loan Terms</h4>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-              <div class="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
-                <span class="font-bold text-slate-800 block mb-1"><i class="fa-regular fa-calendar-check text-indigo-600 mr-1.5"></i> Standard Loan Period</span>
-                <p class="text-slate-600">14 calendar days per book volume with eligibility for 1 renewal.</p>
+          <div id="loans-empty-state" class="hidden py-16 text-center space-y-3 bg-white rounded-2xl border border-dashed border-slate-300">
+            <div class="w-14 h-14 mx-auto rounded-full bg-slate-100 text-slate-400 flex items-center justify-center text-2xl">
+              <i class="fa-solid fa-circle-check text-emerald-500"></i>
+            </div>
+            <h4 class="font-bold text-slate-700" id="loans-empty-title">No outstanding book loans</h4>
+            <p class="text-xs text-slate-500">All books are safely accounted for.</p>
+          </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- VIEW 5: LIBRARY PROFILE (ADMIN ONLY) -->
+        <!-- ========================================== -->
+        <section id="view-library-info" class="admin-only hidden space-y-8">
+          <div class="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-8 space-y-6 shadow-xs">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div>
+                <h3 class="text-lg font-bold text-slate-900">Library Institutional Profile</h3>
+                <p class="text-xs text-slate-500">Official information, operating schedule, and branch contact details</p>
               </div>
-              <div class="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
-                <span class="font-bold text-slate-800 block mb-1"><i class="fa-solid fa-layer-group text-emerald-600 mr-1.5"></i> Member Quotas</span>
-                <p class="text-slate-600">Students: 3 books | Standard: 5 books | Scholar/Premium: 10 books.</p>
+              <button onclick="openModal('modal-edit-library')" class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition">
+                <i class="fa-solid fa-pen-to-square"></i> Edit Profile
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-sm">
+              <div class="space-y-1">
+                <span class="text-xs text-slate-400 font-medium">Institution Name</span>
+                <p class="font-semibold text-slate-800" id="info-name">Alexandria Athenaeum Central Library</p>
               </div>
-              <div class="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
-                <span class="font-bold text-slate-800 block mb-1"><i class="fa-solid fa-triangle-exclamation text-amber-600 mr-1.5"></i> Late Return Fee</span>
-                <p class="text-slate-600">$0.50 per day past due date; borrowing suspended if > 14 days overdue.</p>
+              <div class="space-y-1">
+                <span class="text-xs text-slate-400 font-medium">Head Curator / Chief Librarian</span>
+                <p class="font-semibold text-slate-800" id="info-librarian">Dr. Eleanor Vance, Ph.D.</p>
+              </div>
+              <div class="space-y-1">
+                <span class="text-xs text-slate-400 font-medium">Operating Hours</span>
+                <p class="font-semibold text-slate-800" id="info-hours">Mon - Sat: 8:00 AM – 9:00 PM</p>
+              </div>
+              <div class="space-y-1">
+                <span class="text-xs text-slate-400 font-medium">Official Address</span>
+                <p class="font-semibold text-slate-800" id="info-address">450 University Boulevard, Suite 101</p>
+              </div>
+              <div class="space-y-1">
+                <span class="text-xs text-slate-400 font-medium">Contact Telephone</span>
+                <p class="font-semibold text-slate-800" id="info-phone">+1 (555) 234-8900</p>
+              </div>
+              <div class="space-y-1">
+                <span class="text-xs text-slate-400 font-medium">Inquiry Email</span>
+                <p class="font-semibold text-slate-800" id="info-email">curator@alexandrialibrary.org</p>
+              </div>
+            </div>
+
+            <div class="pt-6 border-t border-slate-100">
+              <h4 class="font-bold text-slate-900 text-sm mb-3">Borrowing Rules & Loan Terms</h4>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                <div class="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
+                  <span class="font-bold text-slate-800 block mb-1"><i class="fa-regular fa-calendar-check text-indigo-600 mr-1.5"></i> Standard Loan Period</span>
+                  <p class="text-slate-600">14 calendar days per book volume with eligibility for 1 renewal.</p>
+                </div>
+                <div class="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
+                  <span class="font-bold text-slate-800 block mb-1"><i class="fa-solid fa-layer-group text-emerald-600 mr-1.5"></i> Member Quotas</span>
+                  <p class="text-slate-600">Students: 3 books | Standard: 5 books | Scholar/Premium: 10 books.</p>
+                </div>
+                <div class="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
+                  <span class="font-bold text-slate-800 block mb-1"><i class="fa-solid fa-triangle-exclamation text-amber-600 mr-1.5"></i> Late Return Fee</span>
+                  <p class="text-slate-600">$0.50 per day past due date; borrowing suspended if > 14 days overdue.</p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- Data Backup & Reset Controls -->
-        <div class="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-8 space-y-4 shadow-xs">
-          <h3 class="text-base font-bold text-slate-900">System Data Management & Persistence</h3>
-          <p class="text-xs text-slate-500">Your books, members, cover images, and loan registries are stored safely in local browser storage. You can backup or restore anytime.</p>
-          
-          <div class="flex flex-wrap items-center gap-3 pt-2">
-            <button onclick="exportData()" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl flex items-center gap-2 transition">
-              <i class="fa-solid fa-download"></i> Export Library Data (JSON)
-            </button>
-            <label class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl flex items-center gap-2 cursor-pointer transition">
-              <i class="fa-solid fa-upload"></i> Import Data
-              <input type="file" id="import-file-input" onchange="importData(event)" accept=".json" class="hidden">
-            </label>
-            <button onclick="resetToSampleData()" class="px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold rounded-xl flex items-center gap-2 transition ml-auto">
-              <i class="fa-solid fa-rotate-left"></i> Reset to Demo Books & Members
-            </button>
+          <!-- Data Backup & Reset Controls -->
+          <div class="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-8 space-y-4 shadow-xs">
+            <h3 class="text-base font-bold text-slate-900">System Data Management & Persistence</h3>
+            <p class="text-xs text-slate-500">Your books, members, login credentials, cover images, and loan registries are stored safely in local browser storage.</p>
+            
+            <div class="flex flex-wrap items-center gap-3 pt-2">
+              <button onclick="exportData()" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl flex items-center gap-2 transition">
+                <i class="fa-solid fa-download"></i> Export Library Data (JSON)
+              </button>
+              <label class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl flex items-center gap-2 cursor-pointer transition">
+                <i class="fa-solid fa-upload"></i> Import Data
+                <input type="file" id="import-file-input" onchange="importData(event)" accept=".json" class="hidden">
+              </label>
+              <button onclick="resetToSampleData()" class="px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold rounded-xl flex items-center gap-2 transition ml-auto">
+                <i class="fa-solid fa-rotate-left"></i> Reset to Demo Books & Members
+              </button>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-    </main>
+      </main>
 
-    <!-- Footer -->
-    <footer class="bg-white border-t border-slate-200/80 py-4 px-8 text-center text-xs text-slate-400">
-      <p>&copy; 2026 Alexandria Library Information System. All Rights Reserved. Designed for Professional Institutional Management.</p>
-    </footer>
+      <!-- Footer -->
+      <footer class="bg-white border-t border-slate-200/80 py-4 px-8 text-center text-xs text-slate-400">
+        <p>&copy; 2026 Alexandria Library Information System. All Rights Reserved.</p>
+      </footer>
+    </div>
   </div>
 
   <!-- ======================================================== -->
@@ -590,7 +723,6 @@
   <!-- ======================================================== -->
   <div id="modal-add-book" class="modal-overlay hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
     <div class="bg-white rounded-2xl w-full max-w-2xl shadow-2xl border border-slate-200 my-8 overflow-hidden transform transition-all">
-      <!-- Modal Header -->
       <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
         <div class="flex items-center gap-2.5">
           <i class="fa-solid fa-book text-amber-400 text-base"></i>
@@ -601,20 +733,16 @@
         </button>
       </div>
 
-      <!-- Modal Body -->
       <form id="form-book" onsubmit="handleSaveBook(event)" class="p-6 space-y-5">
         <input type="hidden" id="book-form-id">
 
-        <!-- Two Column Layout: Left (Cover Image & Preview/Removal), Right (Metadata) -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-          
           <!-- Image Column -->
           <div class="md:col-span-1 space-y-3">
             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wide">
               Book Cover Image
             </label>
             
-            <!-- Cover Preview Box -->
             <div class="relative w-full aspect-[2/3] bg-slate-100 rounded-xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center overflow-hidden group shadow-inner">
               <img id="book-image-preview" src="" alt="Book Cover Preview" class="w-full h-full object-cover hidden">
               
@@ -623,7 +751,7 @@
                 <p class="text-xs">No Cover Selected</p>
               </div>
 
-              <!-- Overlay Remove Image Button (when image is present) -->
+              <!-- Overlay Remove Image Button -->
               <div id="book-image-action-overlay" class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2 transition duration-200 hidden">
                 <button type="button" onclick="removeBookImage()" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg shadow-md flex items-center gap-1.5">
                   <i class="fa-solid fa-trash-can"></i> Remove Image
@@ -631,7 +759,7 @@
               </div>
             </div>
 
-            <!-- Upload from File -->
+            <!-- Upload File -->
             <div>
               <label class="w-full py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl cursor-pointer flex items-center justify-center gap-2 border border-slate-200 transition">
                 <i class="fa-solid fa-cloud-arrow-up text-indigo-600"></i> Upload Image File
@@ -639,14 +767,14 @@
               </label>
             </div>
 
-            <!-- Or Image URL -->
+            <!-- URL input -->
             <div>
               <div class="text-[11px] text-slate-400 text-center mb-1">— or use Image URL —</div>
               <input type="url" id="book-url-input" oninput="handleBookImageUrl(this.value)" placeholder="https://example.com/cover.jpg" 
                      class="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500">
             </div>
 
-            <!-- Remove Image Dedicated Button -->
+            <!-- Dedicated Remove Button -->
             <button type="button" id="btn-remove-image" onclick="removeBookImage()" class="w-full py-1.5 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-lg font-medium transition hidden flex items-center justify-center gap-1.5">
               <i class="fa-solid fa-trash-can"></i> Remove Current Image
             </button>
@@ -677,7 +805,6 @@
                   <option value="Computer Science">
                   <option value="History">
                   <option value="Mathematics">
-                  <option value="Art & Design">
                 </datalist>
               </div>
             </div>
@@ -702,7 +829,7 @@
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label class="block text-xs font-semibold text-slate-700 mb-1">Shelf / Section Location</label>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Shelf Location</label>
                 <input type="text" id="book-input-location" placeholder="e.g. Wing B, Shelf 4A" 
                        class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
               </div>
@@ -715,13 +842,12 @@
 
             <div>
               <label class="block text-xs font-semibold text-slate-700 mb-1">Synopsis / Abstract</label>
-              <textarea id="book-input-desc" rows="3" placeholder="Brief summary of the book content, scope, and key topics..." 
+              <textarea id="book-input-desc" rows="3" placeholder="Brief summary of the book content..." 
                         class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"></textarea>
             </div>
           </div>
         </div>
 
-        <!-- Form Actions -->
         <div class="pt-4 border-t border-slate-200 flex items-center justify-end gap-3">
           <button type="button" onclick="closeModal('modal-add-book')" class="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 font-medium rounded-xl hover:bg-slate-100 transition">
             Cancel
@@ -735,7 +861,7 @@
   </div>
 
   <!-- ======================================================== -->
-  <!-- MODAL: ADD / EDIT MEMBER -->
+  <!-- MODAL: ADD / EDIT MEMBER (WITH USERNAME & PASSWORD MANAGE) -->
   <!-- ======================================================== -->
   <div id="modal-add-member" class="modal-overlay hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto">
     <div class="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-slate-200 my-8 overflow-hidden">
@@ -756,6 +882,27 @@
           <label class="block text-xs font-semibold text-slate-700 mb-1">Full Legal Name <span class="text-rose-500">*</span></label>
           <input type="text" id="member-input-name" required placeholder="e.g. Sarah Jenkins" 
                  class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
+        </div>
+
+        <!-- Login Credentials (View and Manageable by Admin) -->
+        <div class="p-3.5 bg-amber-50/70 border border-amber-200/80 rounded-xl space-y-3">
+          <span class="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+            <i class="fa-solid fa-key text-amber-600"></i> Member Login Credentials (Admin Can View & Edit)
+          </span>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-700 mb-1">Login Username <span class="text-rose-500">*</span></label>
+              <input type="text" id="member-input-username" required placeholder="e.g. sarahj" 
+                     class="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-700 mb-1">Login Password <span class="text-rose-500">*</span></label>
+              <div class="relative">
+                <input type="text" id="member-input-password" required placeholder="e.g. pass123" 
+                       class="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -802,7 +949,7 @@
             Cancel
           </button>
           <button type="submit" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-sm transition">
-            <i class="fa-solid fa-check mr-1.5"></i> Save Member
+            <i class="fa-solid fa-check mr-1.5"></i> Save Member Credentials
           </button>
         </div>
       </form>
@@ -810,14 +957,14 @@
   </div>
 
   <!-- ======================================================== -->
-  <!-- MODAL: ISSUE BOOK TO MEMBER -->
+  <!-- MODAL: ISSUE / BORROW BOOK -->
   <!-- ======================================================== -->
   <div id="modal-issue-book" class="modal-overlay hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-slate-200 overflow-hidden">
       <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
         <div class="flex items-center gap-2.5">
           <i class="fa-solid fa-arrow-right-arrow-left text-cyan-400"></i>
-          <h3 class="font-bold text-base">Check Out / Issue Book</h3>
+          <h3 id="modal-issue-title" class="font-bold text-base">Check Out / Issue Book</h3>
         </div>
         <button onclick="closeModal('modal-issue-book')" class="text-slate-400 hover:text-white">
           <i class="fa-solid fa-xmark text-lg"></i>
@@ -827,16 +974,12 @@
       <form id="form-issue-book" onsubmit="handleIssueBook(event)" class="p-6 space-y-4">
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1">Select Book Volume <span class="text-rose-500">*</span></label>
-          <select id="issue-select-book" required class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
-            <!-- Populated via JS -->
-          </select>
+          <select id="issue-select-book" required class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"></select>
         </div>
 
-        <div>
+        <div id="issue-member-container">
           <label class="block text-xs font-semibold text-slate-700 mb-1">Select Member Borrower <span class="text-rose-500">*</span></label>
-          <select id="issue-select-member" required class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
-            <!-- Populated via JS -->
-          </select>
+          <select id="issue-select-member" required class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"></select>
         </div>
 
         <div class="grid grid-cols-2 gap-3">
@@ -879,9 +1022,7 @@
       <div class="p-6">
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
           <div class="sm:col-span-1">
-            <div id="detail-book-cover" class="w-full aspect-[2/3] rounded-xl overflow-hidden shadow-md bg-slate-100 border border-slate-200 flex items-center justify-center">
-              <!-- Cover image or stylish procedural banner -->
-            </div>
+            <div id="detail-book-cover" class="w-full aspect-[2/3] rounded-xl overflow-hidden shadow-md bg-slate-100 border border-slate-200 flex items-center justify-center"></div>
           </div>
           <div class="sm:col-span-2 space-y-4">
             <div>
@@ -898,14 +1039,21 @@
               <div><span class="text-slate-400">ISBN:</span> <strong id="detail-book-isbn" class="text-slate-700">N/A</strong></div>
               <div><span class="text-slate-400">Year:</span> <strong id="detail-book-year" class="text-slate-700">N/A</strong></div>
               <div><span class="text-slate-400">Location:</span> <strong id="detail-book-loc" class="text-slate-700">Shelf A1</strong></div>
-              <div><span class="text-slate-400">Stock Status:</span> <strong id="detail-book-stock" class="text-emerald-600 font-bold">Available (3/3)</strong></div>
+              <div><span class="text-slate-400">Stock Status:</span> <strong id="detail-book-stock" class="text-emerald-600 font-bold">Available</strong></div>
             </div>
 
+            <!-- Actions Bar: Borrow for Member or Edit/Delete for Admin -->
             <div class="pt-3 border-t border-slate-100 flex items-center gap-2.5">
-              <button id="detail-btn-edit" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-xl transition">
+              <!-- Member Borrow Button -->
+              <button id="detail-btn-member-borrow" class="hidden px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition shadow-xs flex items-center gap-1.5">
+                <i class="fa-solid fa-arrow-right-arrow-left"></i> Borrow This Volume
+              </button>
+
+              <!-- Admin Controls -->
+              <button id="detail-btn-edit" class="admin-only px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-xl transition">
                 <i class="fa-solid fa-pen-to-square mr-1"></i> Edit Book & Cover
               </button>
-              <button id="detail-btn-delete" class="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold rounded-xl transition">
+              <button id="detail-btn-delete" class="admin-only px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold rounded-xl transition">
                 <i class="fa-solid fa-trash-can mr-1"></i> Remove Book
               </button>
             </div>
@@ -925,7 +1073,7 @@
       </div>
       <div>
         <h3 id="delete-confirm-title" class="text-lg font-bold text-slate-900">Confirm Deletion</h3>
-        <p id="delete-confirm-desc" class="text-xs text-slate-500 mt-1">Are you sure you want to permanently remove this record from Alexandria?</p>
+        <p id="delete-confirm-desc" class="text-xs text-slate-500 mt-1">Are you sure you want to permanently remove this record?</p>
       </div>
       <div class="flex items-center justify-center gap-3 pt-2">
         <button onclick="closeModal('modal-confirm-delete')" class="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition">
